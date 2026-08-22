@@ -41,7 +41,9 @@
         </div>
 
         <button class="primary-button" id="add-record-button">＋ スクワットを記録</button>
+        <button class="share-button" id="share-button">𝕏 今日の記録をシェア</button>
         <article class="mission-card"><span>⚑</span><div><strong>本日のミッション</strong><p id="mission-text"></p></div></article>
+        <article id="reminder-banner" class="reminder-banner" hidden><span>◷</span><div><strong>今日の一杯、まだ残ってるよ。</strong><p id="reminder-text"></p></div><button id="reminder-settings-button">設定</button></article>
       </section>
 
       <section id="history-page" class="page" aria-label="履歴">
@@ -58,6 +60,7 @@
       <section id="settings-page" class="page" aria-label="設定">
         <article class="settings-card"><label for="maid-name-input">スタッフの名前</label><input id="maid-name-input" class="settings-input" maxlength="20" value="ルナ" placeholder="例：ルナ" /><p class="input-hint">応援メッセージやスタッフ一覧に反映されます。</p></article>
         <article class="settings-card"><label for="goal-input">1日の目標回数</label><div class="goal-control"><button id="goal-minus" aria-label="目標を減らす">−</button><input id="goal-input" type="number" inputmode="numeric" min="5" max="500" step="5" value="30" aria-label="1日の目標回数" /><span>回</span><button id="goal-plus" aria-label="目標を増やす">＋</button></div></article>
+        <article class="settings-card"><label class="toggle-row" for="reminder-enabled"><span>リマインド</span><input id="reminder-enabled" type="checkbox" role="switch" /><i></i></label><div id="reminder-options" class="reminder-options"><label for="reminder-time">リマインド時刻</label><input id="reminder-time" type="time" value="20:00" /><button id="notification-permission-button" class="secondary-button">通知を許可する</button><p class="input-hint">アプリを開いている間は設定時刻に通知します。閉じている間の通知には配信サーバーの接続が必要です。</p></div></article>
         <article class="settings-card about"><strong>SQUAT BAR</strong><p>カウンター越しのひとことと、毎日の小さな積み重ねを。</p></article>
       </section>
     </main>
