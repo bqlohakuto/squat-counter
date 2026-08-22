@@ -60,7 +60,7 @@ function renderUnlocks(selector, items, all, usesMaidName = false) {
 }
 function escapeHtml(text) { const div = document.createElement("div"); div.textContent = text; return div.innerHTML; }
 function showPage(page) {
-  const titles = { home: "カウンター", history: "記録の履歴", collection: "お店のコレクション", settings: "設定" };
+  const titles = { home: "", history: "記録の履歴", collection: "お店のコレクション", settings: "設定" };
   document.querySelectorAll(".page").forEach(el => el.classList.remove("active")); document.querySelector(`#${page}-page`).classList.add("active");
   document.querySelector("#page-title").textContent = titles[page];
   document.querySelectorAll(".tab").forEach(tab => tab.classList.toggle("active", tab.dataset.page === page));
