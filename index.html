@@ -24,7 +24,7 @@
         <article class="maid-card">
           <div class="maid-portrait" aria-hidden="true">🌙</div>
           <div>
-            <p class="maid-name">メイドのルナ</p>
+            <p id="maid-name" class="maid-name">メイドのルナ</p>
             <p id="encouragement" class="maid-message"></p>
             <span id="achievement-badge" class="achievement-badge" hidden>✦ 目標達成</span>
           </div>
@@ -56,6 +56,7 @@
       </section>
 
       <section id="settings-page" class="page" aria-label="設定">
+        <article class="settings-card"><label for="maid-name-input">メイドの名前</label><input id="maid-name-input" class="settings-input" maxlength="20" value="ルナ" placeholder="例：ルナ" /><p class="input-hint">応援メッセージやコレクションに反映されます。</p></article>
         <article class="settings-card"><label for="goal-input">1日の目標回数</label><div class="goal-control"><button id="goal-minus" aria-label="目標を減らす">−</button><input id="goal-input" type="number" inputmode="numeric" min="5" max="500" step="5" value="30" aria-label="1日の目標回数" /><span>回</span><button id="goal-plus" aria-label="目標を増やす">＋</button></div></article>
         <article class="settings-card about"><strong>スクワットメイド</strong><p>毎日の小さな積み重ねを、メイドたちと楽しみましょう。</p></article>
       </section>

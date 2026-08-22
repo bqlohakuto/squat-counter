@@ -12,7 +12,7 @@ const REWARDS = [
 let data = loadData();
 let inputCount = 10;
 
-function loadData() { try { return { goal: 30, records: [], ...JSON.parse(localStorage.getItem(STORAGE_KEY)) }; } catch { return { goal: 30, records: [] }; } }
+function loadData() { try { return { goal: 30, maidName: "ルナ", records: [], ...JSON.parse(localStorage.getItem(STORAGE_KEY)) }; } catch { return { goal: 30, maidName: "ルナ", records: [] }; } }
 function saveData() { localStorage.setItem(STORAGE_KEY, JSON.stringify(data)); }
 function dayKey(value) { const d = new Date(value); return `${d.getFullYear()}-${d.getMonth()}-${d.getDate()}`; }
 function todayKey() { return dayKey(Date.now()); }
@@ -36,6 +36,8 @@ function render() {
   document.querySelector("#achievement-badge").hidden = !achieved;
   document.querySelector("#collection-total").textContent = all;
   document.querySelector("#goal-input").value = data.goal;
+  document.querySelector("#maid-name").textContent = `メイドの${data.maidName}`;
+  document.querySelector("#maid-name-input").value = data.maidName;
   renderHistory(); renderCollection(all);
 }
 function renderHistory() {
@@ -48,10 +50,10 @@ function renderHistory() {
     list.append(item);
   });
 }
-function renderCollection(all) { renderUnlocks("#maid-list", MAIDS, all); renderUnlocks("#reward-list", REWARDS, all); }
-function renderUnlocks(selector, items, all) {
+function renderCollection(all) { renderUnlocks("#maid-list", MAIDS, all, true); renderUnlocks("#reward-list", REWARDS, all); }
+function renderUnlocks(selector, items, all, usesMaidName = false) {
   const root = document.querySelector(selector); root.innerHTML = "";
-  items.forEach(item => { const unlocked = all >= item.threshold; const row = document.createElement("article"); row.className = `unlock-row ${unlocked ? "" : "locked"}`; row.innerHTML = `<div class="unlock-icon">${unlocked ? item.icon : "🔒"}</div><div class="unlock-copy"><strong>${unlocked ? item.name : "？？？"}</strong><span>${unlocked ? item.role : `累計${item.threshold}回で解放`}</span></div><span class="${unlocked ? "unlock-status" : "lock-status"}">${unlocked ? "✓" : "🔒"}</span>`; root.append(row); });
+  items.forEach((item, index) => { const unlocked = all >= item.threshold; const name = usesMaidName && index === 0 ? data.maidName : item.name; const row = document.createElement("article"); row.className = `unlock-row ${unlocked ? "" : "locked"}`; row.innerHTML = `<div class="unlock-icon">${unlocked ? item.icon : "🔒"}</div><div class="unlock-copy"><strong>${unlocked ? escapeHtml(name) : "？？？"}</strong><span>${unlocked ? item.role : `累計${item.threshold}回で解放`}</span></div><span class="${unlocked ? "unlock-status" : "lock-status"}">${unlocked ? "✓" : "🔒"}</span>`; root.append(row); });
 }
 function escapeHtml(text) { const div = document.createElement("div"); div.textContent = text; return div.innerHTML; }
 function showPage(page) {
@@ -71,9 +73,10 @@ function setInputCount(value) { inputCount = normalizedCount(value); document.qu
 document.querySelector("#count-minus").onclick = () => setInputCount(inputCount - 5);
 document.querySelector("#count-plus").onclick = () => setInputCount(inputCount + 5);
 document.querySelector("#count-input").addEventListener("change", event => setInputCount(event.target.value));
-document.querySelector("#record-form").addEventListener("submit", event => { event.preventDefault(); setInputCount(document.querySelector("#count-input").value); const before = todayTotal(); data.records.push({ id: crypto.randomUUID(), count: inputCount, memo: document.querySelector("#memo-input").value.trim(), createdAt: Date.now() }); saveData(); document.querySelector("#record-dialog").close(); document.querySelector("#memo-input").value = ""; render(); toast(before < data.goal && todayTotal() >= data.goal ? "✦ 目標達成！ ルナがお祝いしています" : `ルナ「${inputCount}回、立派です！」`); });
+document.querySelector("#record-form").addEventListener("submit", event => { event.preventDefault(); setInputCount(document.querySelector("#count-input").value); const before = todayTotal(); data.records.push({ id: crypto.randomUUID(), count: inputCount, memo: document.querySelector("#memo-input").value.trim(), createdAt: Date.now() }); saveData(); document.querySelector("#record-dialog").close(); document.querySelector("#memo-input").value = ""; render(); toast(before < data.goal && todayTotal() >= data.goal ? `✦ 目標達成！ ${data.maidName}がお祝いしています` : `${data.maidName}「${inputCount}回、立派です！」`); });
 document.querySelector("#goal-minus").onclick = () => { data.goal = Math.max(5, data.goal - 5); saveData(); render(); };
 document.querySelector("#goal-plus").onclick = () => { data.goal = Math.min(500, data.goal + 5); saveData(); render(); };
 document.querySelector("#goal-input").addEventListener("change", event => { data.goal = Math.min(500, Math.max(5, Number.parseInt(event.target.value, 10) || 5)); saveData(); render(); });
+document.querySelector("#maid-name-input").addEventListener("change", event => { data.maidName = event.target.value.trim().slice(0, 20) || "ルナ"; saveData(); render(); });
 if ("serviceWorker" in navigator) navigator.serviceWorker.register("service-worker.js");
 render();
