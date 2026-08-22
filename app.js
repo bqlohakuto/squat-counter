@@ -32,7 +32,8 @@ function render() {
   document.querySelector("#streak-count").textContent = streak();
   document.querySelector("#progress-bar").style.width = `${Math.min(100, current / data.goal * 100)}%`;
   document.querySelector("#mission-text").textContent = `スクワットを${data.goal}回行う（${Math.min(current, data.goal)} / ${data.goal}）`;
-  document.querySelector("#encouragement").textContent = achieved ? "目標クリア。いい夜にしよう。" : current ? `いいペース。あと${data.goal - current}回で今日の目標だよ。` : "おつかれさま。今日はどれくらいやる？";
+  const reminderDue = data.remindersEnabled && current === 0 && new Date().toTimeString().slice(0, 5) >= data.reminderTime;
+  document.querySelector("#encouragement").textContent = reminderDue ? "今日の一杯、まだ残ってるよ。少しだけ動いていこう。" : achieved ? "目標クリア。いい夜にしよう。" : current ? `いいペース。あと${data.goal - current}回で今日の目標だよ。` : "おつかれさま。今日はどれくらいやる？";
   document.querySelector("#achievement-badge").hidden = !achieved;
   document.querySelector("#collection-total").textContent = all;
   document.querySelector("#goal-input").value = data.goal;
@@ -41,9 +42,6 @@ function render() {
   document.querySelector("#reminder-enabled").checked = data.remindersEnabled;
   document.querySelector("#reminder-time").value = data.reminderTime;
   document.querySelector("#reminder-options").hidden = !data.remindersEnabled;
-  const due = data.remindersEnabled && current === 0 && new Date().toTimeString().slice(0, 5) >= data.reminderTime;
-  document.querySelector("#reminder-banner").hidden = !due;
-  document.querySelector("#reminder-text").textContent = `設定した${data.reminderTime}を過ぎています。少しだけ動いていこう。`;
   renderHistory(); renderCollection(all);
 }
 function renderHistory() {
@@ -97,7 +95,6 @@ document.querySelector("#goal-input").addEventListener("change", event => { data
 document.querySelector("#maid-name-input").addEventListener("change", event => { data.maidName = event.target.value.trim().slice(0, 20) || "ルナ"; saveData(); render(); });
 document.querySelector("#reminder-enabled").addEventListener("change", event => { data.remindersEnabled = event.target.checked; saveData(); render(); scheduleReminder(); });
 document.querySelector("#reminder-time").addEventListener("change", event => { data.reminderTime = event.target.value || "20:00"; saveData(); render(); scheduleReminder(); });
-document.querySelector("#reminder-settings-button").onclick = () => showPage("settings");
 document.querySelector("#notification-permission-button").onclick = async () => { if (!("Notification" in window)) return toast("このブラウザでは通知を利用できません。"); const result = await Notification.requestPermission(); toast(result === "granted" ? "通知を許可しました。" : "通知は許可されていません。"); };
 if ("serviceWorker" in navigator) navigator.serviceWorker.register("service-worker.js");
 render();

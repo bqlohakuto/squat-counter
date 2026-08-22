@@ -31,7 +31,7 @@
         </article>
 
         <article class="progress-card">
-          <div class="progress-label"><span>今日のスクワット</span><strong id="today-count">0 / 30 回</strong></div>
+          <div class="progress-label"><span>今日のスクワット</span><div class="progress-actions"><button id="add-record-button" class="progress-action" aria-label="スクワットを記録">＋</button><button id="share-button" class="progress-action x-action" aria-label="今日の記録をXへ投稿">𝕏</button><strong id="today-count">0 / 30 回</strong></div></div>
           <div class="progress-track"><div id="progress-bar" class="progress-bar"></div></div>
         </article>
 
@@ -40,10 +40,7 @@
           <article class="stat-card"><span class="stat-icon">🏋️</span><strong id="total-count">0</strong><span>累計スクワット</span></article>
         </div>
 
-        <button class="primary-button" id="add-record-button">＋ スクワットを記録</button>
-        <button class="share-button" id="share-button">𝕏 今日の記録をシェア</button>
         <article class="mission-card"><span>⚑</span><div><strong>本日のミッション</strong><p id="mission-text"></p></div></article>
-        <article id="reminder-banner" class="reminder-banner" hidden><span>◷</span><div><strong>今日の一杯、まだ残ってるよ。</strong><p id="reminder-text"></p></div><button id="reminder-settings-button">設定</button></article>
       </section>
 
       <section id="history-page" class="page" aria-label="履歴">
