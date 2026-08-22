@@ -23,7 +23,7 @@
         <article class="bar-card">
           <div class="bar-lights" aria-hidden="true"><i></i><i></i><i></i><i></i><i></i></div>
           <div class="bar-backdrop" aria-hidden="true"><span>◒</span><span>◇</span><span>◐</span></div>
-          <div class="character-portrait"><img src="maid-character.jpg" alt="バーのスタッフ" /></div>
+          <div class="character-portrait"><img src="maid-character-transparent.png" alt="バーのスタッフ" /></div>
           <div class="counter-edge" aria-hidden="true"></div>
           <div class="bar-stools" aria-hidden="true"><span></span><span></span><span></span></div>
         </article>
@@ -49,7 +49,7 @@
 
       <section id="collection-page" class="page" aria-label="屋敷">
         <p class="collection-summary">累計 <strong id="collection-total">0</strong> 回</p>
-        <h2>スタッフ</h2><div id="maid-list" class="collection-list"></div>
+        <h2>スタッフ</h2><button id="show-fullbody-button" class="staff-showcase"><img src="maid-character-transparent.png" alt="スタッフの全身イラスト" /><span><strong id="staff-showcase-name">ルナ</strong><small>全身を見る</small></span><b>›</b></button><div id="maid-list" class="collection-list"></div>
         <h2>ごほうび</h2><div id="reward-list" class="collection-list"></div>
       </section>
 
@@ -80,6 +80,10 @@
         <p class="maid-tip">「無理はしないで。フォームを整えて、気持ちよくいこう。」</p>
         <button id="record-save-button" class="primary-button" value="default">保存する</button>
       </form>
+    </dialog>
+    <dialog id="staff-dialog" class="staff-dialog">
+      <button id="close-staff-dialog" class="close-button" aria-label="閉じる">×</button>
+      <img src="maid-character-transparent.png" alt="スタッフの全身イラスト" />
     </dialog>
     <div id="toast" class="toast" role="status" aria-live="polite"></div>
     <script src="app.js"></script>

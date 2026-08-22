@@ -39,6 +39,7 @@ function render() {
   document.querySelector("#goal-input").value = data.goal;
   document.querySelector("#maid-name").textContent = `スタッフ：${data.maidName}`;
   document.querySelector("#maid-name-input").value = data.maidName;
+  document.querySelector("#staff-showcase-name").textContent = data.maidName;
   renderHistory(); renderCollection(all);
 }
 function renderHistory() {
@@ -90,5 +91,7 @@ document.querySelector("#goal-plus").onclick = () => { data.goal = Math.min(500,
 document.querySelector("#goal-input").addEventListener("change", event => { data.goal = Math.min(500, Math.max(5, Number.parseInt(event.target.value, 10) || 5)); saveData(); render(); });
 document.querySelector("#maid-name-input").addEventListener("change", event => { data.maidName = event.target.value.trim().slice(0, 20) || "ルナ"; saveData(); render(); });
 document.querySelector("#add-reminder-button").onclick = async () => { const reminder = { title: "SQUAT BAR", text: "スクワットを記録する", url: location.href }; if (!navigator.share) return toast("iPhoneのSafariから開くとリマインダーへ追加できます。"); try { await navigator.share(reminder); } catch (error) { if (error.name !== "AbortError") toast("共有メニューを開けませんでした。"); } };
+document.querySelector("#show-fullbody-button").onclick = () => document.querySelector("#staff-dialog").showModal();
+document.querySelector("#close-staff-dialog").onclick = () => document.querySelector("#staff-dialog").close();
 if ("serviceWorker" in navigator) navigator.serviceWorker.register("service-worker.js");
 render();
