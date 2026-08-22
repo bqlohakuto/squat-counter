@@ -1,4 +1,5 @@
 const STORAGE_KEY = "squat-maid-data-v1";
+const SQUAT_MET = 5;
 const MAIDS = [
   { name: "ルナ", role: "カウンター担当", icon: "🍸", threshold: 0 },
   { name: "ココ", role: "にぎやかなホールスタッフ", icon: "🍒", threshold: 500 },
@@ -14,13 +15,18 @@ let inputCount = 10;
 let editingRecordId = null;
 let motionState = null;
 let motionOriginRecord = null;
+let motionTimer = null;
+let pendingMotionResult = null;
 
-function loadData() { try { return { goal: 30, maidName: "ルナ", records: [], ...JSON.parse(localStorage.getItem(STORAGE_KEY)) }; } catch { return { goal: 30, maidName: "ルナ", records: [] }; } }
+function loadData() { try { return { goal: 30, maidName: "ルナ", weightKg: 60, records: [], ...JSON.parse(localStorage.getItem(STORAGE_KEY)) }; } catch { return { goal: 30, maidName: "ルナ", weightKg: 60, records: [] }; } }
 function saveData() { localStorage.setItem(STORAGE_KEY, JSON.stringify(data)); }
 function dayKey(value) { const d = new Date(value); return `${d.getFullYear()}-${d.getMonth()}-${d.getDate()}`; }
 function todayKey() { return dayKey(Date.now()); }
 function total() { return data.records.reduce((sum, record) => sum + record.count, 0); }
 function todayTotal() { return data.records.filter(record => dayKey(record.createdAt) === todayKey()).reduce((sum, record) => sum + record.count, 0); }
+function activeEnergy(seconds, weightKg = data.weightKg) { return Math.max(0, (SQUAT_MET - 1) * 3.5 * weightKg / 200 * (seconds / 60)); }
+function formatEnergy(value) { return `${Number(value || 0).toFixed(1)} kcal`; }
+function formatDuration(seconds) { const safe = Math.max(0, Math.floor(seconds || 0)); return `${Math.floor(safe / 60)}:${String(safe % 60).padStart(2, "0")}`; }
 function streak() {
   const days = new Set(data.records.map(record => dayKey(record.createdAt)));
   let date = new Date(); date.setHours(0,0,0,0);
@@ -39,6 +45,7 @@ function render() {
   document.querySelector("#achievement-badge").hidden = !achieved;
   document.querySelector("#collection-total").textContent = all;
   document.querySelector("#goal-input").value = data.goal;
+  document.querySelector("#weight-input").value = data.weightKg;
   document.querySelector("#maid-name").textContent = `スタッフ：${data.maidName}`;
   document.querySelector("#maid-name-input").value = data.maidName;
   document.querySelector("#staff-showcase-name").textContent = data.maidName;
@@ -46,10 +53,17 @@ function render() {
 }
 function renderHistory() {
   const list = document.querySelector("#history-list"), empty = document.querySelector("#history-empty");
+  const best = data.records.reduce((bestRecord, record) => !bestRecord || record.count > bestRecord.count ? record : bestRecord, null);
+  const energyTotal = data.records.reduce((sum, record) => sum + Number(record.activeEnergy || 0), 0);
+  document.querySelector("#history-best-count").textContent = `${best?.count ?? 0}回`;
+  document.querySelector("#history-best-energy").textContent = formatEnergy(best?.activeEnergy);
+  document.querySelector("#history-total-count").textContent = `${total()}回`;
+  document.querySelector("#history-total-energy").textContent = formatEnergy(energyTotal);
   list.innerHTML = ""; empty.hidden = data.records.length > 0;
   [...data.records].sort((a,b) => b.createdAt - a.createdAt).forEach(record => {
     const d = new Date(record.createdAt); const item = document.createElement("article"); item.className = "history-item";
-    item.innerHTML = `<div class="history-icon">🏋️</div><div class="history-copy"><strong>${record.count} 回</strong><span>${d.toLocaleString("ja-JP", {month:"numeric",day:"numeric",hour:"2-digit",minute:"2-digit"})}${record.memo ? ` · ${escapeHtml(record.memo)}` : ""}</span></div><div class="history-actions"><button class="edit-button" aria-label="記録を編集">編集</button><button class="delete-button" aria-label="記録を削除">削除</button></div>`;
+    const metrics = record.durationSeconds ? ` · ${formatDuration(record.durationSeconds)} · ${formatEnergy(record.activeEnergy)}` : "";
+    item.innerHTML = `<div class="history-icon">🏋️</div><div class="history-copy"><strong>${record.count} 回</strong><span>${d.toLocaleString("ja-JP", {month:"numeric",day:"numeric",hour:"2-digit",minute:"2-digit"})}${metrics}${record.memo ? ` · ${escapeHtml(record.memo)}` : ""}</span></div><div class="history-actions"><button class="edit-button" aria-label="記録を編集">編集</button><button class="delete-button" aria-label="記録を削除">削除</button></div>`;
     item.querySelector(".edit-button").onclick = () => openRecordDialog(record);
     item.querySelector(".delete-button").onclick = () => { data.records = data.records.filter(item => item.id !== record.id); saveData(); render(); };
     list.append(item);
@@ -71,9 +85,10 @@ function toast(message) { const element = document.querySelector("#toast"); elem
 
 document.querySelectorAll(".tab").forEach(tab => tab.onclick = () => showPage(tab.dataset.page));
 function localDateTimeValue(timestamp) { const date = new Date(timestamp); const offset = date.getTimezoneOffset() * 60_000; return new Date(date - offset).toISOString().slice(0, 16); }
-function openRecordDialog(record = null, presetCount = null) {
+function openRecordDialog(record = null, presetCount = null, motionResult = null) {
   stopMotionCounter();
   motionState = null;
+  pendingMotionResult = motionResult;
   editingRecordId = record?.id ?? null;
   setInputCount(presetCount ?? record?.count ?? 10);
   document.querySelector("#memo-input").value = record?.memo ?? "";
@@ -95,6 +110,9 @@ function updateMotionUi() {
   const labels = { idle: ["Ⅰ", "開始前"], calibrating: ["Ⅰ", "直立姿勢を確認中"], ready: ["Ⅱ", "しゃがんでください"], down: ["Ⅲ", "しゃがみ姿勢 OK"], done: ["✓", "計測を終了しました"] };
   const [mark, label] = labels[state.phase] ?? labels.idle;
   document.querySelector("#motion-count").textContent = state.count;
+  const elapsed = state.startedAt ? Math.floor((Date.now() - state.startedAt) / 1000) : state.durationSeconds ?? 0;
+  document.querySelector("#motion-duration").textContent = formatDuration(elapsed);
+  document.querySelector("#motion-energy").innerHTML = `${activeEnergy(elapsed).toFixed(1)} <small>kcal</small>`;
   document.querySelector("#motion-posture").dataset.phase = state.phase;
   document.querySelector("#motion-posture-mark").textContent = mark;
   document.querySelector("#motion-posture-label").textContent = label;
@@ -124,12 +142,13 @@ function handleDeviceOrientation(event) {
 }
 function stopMotionCounter() {
   if (motionState?.active) window.removeEventListener("deviceorientation", handleDeviceOrientation);
+  if (motionTimer) { window.clearInterval(motionTimer); motionTimer = null; }
   if (motionState) motionState.active = false;
 }
 function openMotionCounter() {
   motionOriginRecord = editingRecordId ? data.records.find(record => record.id === editingRecordId) : null;
   document.querySelector("#record-dialog").close();
-  motionState = { active: false, phase: "idle", samples: [], count: 0, lastCountAt: 0 };
+  motionState = { active: false, phase: "idle", samples: [], count: 0, lastCountAt: 0, durationSeconds: 0 };
   updateMotionUi(); setMotionStatus("スマホの背面を太ももへ。上部を下にして、直立した姿勢で準備してください。");
   document.querySelector("#motion-dialog").showModal();
 }
@@ -140,25 +159,29 @@ async function startMotionCounter() {
       const permission = await DeviceOrientationEvent.requestPermission();
       if (permission !== "granted") return setMotionStatus("センサーの利用が許可されませんでした。Safariの設定をご確認ください。");
     }
-    motionState = { active: true, phase: "calibrating", samples: [], count: 0, lastCountAt: 0 };
+    motionState = { active: true, phase: "calibrating", samples: [], count: 0, lastCountAt: 0, startedAt: Date.now() };
     updateMotionUi(); setMotionStatus("直立姿勢を確認しています。太ももを動かさずにお待ちください…");
     window.addEventListener("deviceorientation", handleDeviceOrientation);
+    motionTimer = window.setInterval(updateMotionUi, 500);
   } catch { setMotionStatus("センサーを開始できませんでした。HTTPSのSafariからお試しください。"); }
 }
 function finishMotionCounter() {
   const count = motionState?.count ?? 0;
+  const durationSeconds = Math.max(1, Math.floor((Date.now() - (motionState?.startedAt ?? Date.now())) / 1000));
+  const result = { durationSeconds, activeEnergy: activeEnergy(durationSeconds) };
   stopMotionCounter(); document.querySelector("#motion-dialog").close();
-  if (count) openRecordDialog(motionOriginRecord, count);
+  if (count) openRecordDialog(motionOriginRecord, count, result);
 }
 document.querySelector("#motion-open-button").onclick = openMotionCounter;
 document.querySelector("#motion-begin-button").onclick = startMotionCounter;
 document.querySelector("#motion-finish-button").onclick = finishMotionCounter;
 document.querySelector("#motion-close-button").onclick = () => document.querySelector("#motion-dialog").close();
 document.querySelector("#motion-dialog").addEventListener("close", stopMotionCounter);
-document.querySelector("#record-form").addEventListener("submit", event => { event.preventDefault(); setInputCount(document.querySelector("#count-input").value); const before = todayTotal(); const createdAt = new Date(document.querySelector("#performed-at-input").value).getTime() || Date.now(); const memo = document.querySelector("#memo-input").value.trim(); const existing = data.records.find(record => record.id === editingRecordId); if (existing) { existing.count = inputCount; existing.memo = memo; existing.createdAt = createdAt; } else { data.records.push({ id: crypto.randomUUID(), count: inputCount, memo, createdAt }); } saveData(); document.querySelector("#record-dialog").close(); document.querySelector("#memo-input").value = ""; const wasEditing = editingRecordId !== null; editingRecordId = null; render(); if (!wasEditing) toast(before < data.goal && todayTotal() >= data.goal ? `✦ 目標クリア。${data.maidName}から一杯どうぞ。` : `${data.maidName}「${inputCount}回、いいね。」`); });
+document.querySelector("#record-form").addEventListener("submit", event => { event.preventDefault(); setInputCount(document.querySelector("#count-input").value); const before = todayTotal(); const createdAt = new Date(document.querySelector("#performed-at-input").value).getTime() || Date.now(); const memo = document.querySelector("#memo-input").value.trim(); const existing = data.records.find(record => record.id === editingRecordId); if (existing) { existing.count = inputCount; existing.memo = memo; existing.createdAt = createdAt; if (pendingMotionResult) Object.assign(existing, pendingMotionResult); } else { data.records.push({ id: crypto.randomUUID(), count: inputCount, memo, createdAt, ...(pendingMotionResult ?? {}) }); } saveData(); document.querySelector("#record-dialog").close(); document.querySelector("#memo-input").value = ""; const wasEditing = editingRecordId !== null; editingRecordId = null; pendingMotionResult = null; render(); if (!wasEditing) toast(before < data.goal && todayTotal() >= data.goal ? `✦ 目標クリア。${data.maidName}から一杯どうぞ。` : `${data.maidName}「${inputCount}回、いいね。」`); });
 document.querySelector("#goal-minus").onclick = () => { data.goal = Math.max(5, data.goal - 5); saveData(); render(); };
 document.querySelector("#goal-plus").onclick = () => { data.goal = Math.min(500, data.goal + 5); saveData(); render(); };
 document.querySelector("#goal-input").addEventListener("change", event => { data.goal = Math.min(500, Math.max(5, Number.parseInt(event.target.value, 10) || 5)); saveData(); render(); });
+document.querySelector("#weight-input").addEventListener("change", event => { data.weightKg = Math.min(300, Math.max(20, Number.parseFloat(event.target.value) || 20)); saveData(); render(); });
 document.querySelector("#maid-name-input").addEventListener("change", event => { data.maidName = event.target.value.trim().slice(0, 20) || "ルナ"; saveData(); render(); });
 document.querySelector("#add-reminder-button").onclick = async () => { const reminder = { title: "SQUAT BAR", text: "スクワットを記録する", url: location.href }; if (!navigator.share) return toast("iPhoneのSafariから開くとリマインダーへ追加できます。"); try { await navigator.share(reminder); } catch (error) { if (error.name !== "AbortError") toast("共有メニューを開けませんでした。"); } };
 document.querySelector("#show-fullbody-button").onclick = () => document.querySelector("#staff-dialog").showModal();

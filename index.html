@@ -43,6 +43,10 @@
       </section>
 
       <section id="history-page" class="page" aria-label="履歴">
+        <div class="history-summary">
+          <article class="history-summary-card"><span>最高記録</span><strong id="history-best-count">0回</strong><small id="history-best-energy">0.0 kcal</small></article>
+          <article class="history-summary-card"><span>累計記録</span><strong id="history-total-count">0回</strong><small id="history-total-energy">0.0 kcal</small></article>
+        </div>
         <div id="history-list" class="history-list"></div>
         <div id="history-empty" class="empty-state"><span>🗓️</span><h2>まだ記録がありません</h2><p>ホームから最初のスクワットを記録しましょう。</p></div>
       </section>
@@ -56,6 +60,7 @@
       <section id="settings-page" class="page" aria-label="設定">
         <article class="settings-card"><label for="maid-name-input">スタッフの名前</label><input id="maid-name-input" class="settings-input" maxlength="20" value="ルナ" placeholder="例：ルナ" /><p class="input-hint">応援メッセージやスタッフ一覧に反映されます。</p></article>
         <article class="settings-card"><label for="goal-input">1日の目標回数</label><div class="goal-control"><button id="goal-minus" aria-label="目標を減らす">−</button><input id="goal-input" type="number" inputmode="numeric" min="5" max="500" step="5" value="30" aria-label="1日の目標回数" /><span>回</span><button id="goal-plus" aria-label="目標を増やす">＋</button></div></article>
+        <article class="settings-card"><label for="weight-input">体重</label><div class="weight-control"><input id="weight-input" type="number" inputmode="decimal" min="20" max="300" step="0.1" value="60" aria-label="体重" /><span>kg</span></div><p class="input-hint">太もも計測時のアクティブエネルギー概算に使います。</p></article>
         <article class="settings-card"><strong>リマインダー</strong><p class="input-hint">共有メニューから「リマインダー」を選び、通知時刻を設定できます。</p><button id="add-reminder-button" class="secondary-button">iPhoneのリマインダーに追加</button></article>
         <article class="settings-card about"><strong>SQUAT BAR</strong><p>カウンター越しのひとことと、毎日の小さな積み重ねを。</p></article>
       </section>
@@ -94,6 +99,7 @@
       <p class="motion-dialog-kicker">THIGH SQUAT COUNTER</p>
       <h2>太ももで計測</h2>
       <div class="motion-live-count"><span>現在の回数</span><strong id="motion-count">0</strong><small>回</small></div>
+      <div class="motion-metrics"><article><span>計測時間</span><strong id="motion-duration">0:00</strong></article><article><span>アクティブエネルギー</span><strong id="motion-energy">0.0 <small>kcal</small></strong></article></div>
       <section id="motion-posture" class="motion-posture" data-phase="idle" aria-live="polite">
         <span id="motion-posture-mark">Ⅰ</span><strong id="motion-posture-label">開始前</strong><p id="motion-status">スマホの背面を太ももへ。上部を下にして、直立した姿勢で準備してください。</p>
       </section>
