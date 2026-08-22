@@ -13,7 +13,7 @@ let data = loadData();
 let inputCount = 10;
 let editingRecordId = null;
 
-function loadData() { try { return { goal: 30, maidName: "ルナ", remindersEnabled: false, reminderTime: "20:00", lastReminderDay: "", records: [], ...JSON.parse(localStorage.getItem(STORAGE_KEY)) }; } catch { return { goal: 30, maidName: "ルナ", remindersEnabled: false, reminderTime: "20:00", lastReminderDay: "", records: [] }; } }
+function loadData() { try { return { goal: 30, maidName: "ルナ", records: [], ...JSON.parse(localStorage.getItem(STORAGE_KEY)) }; } catch { return { goal: 30, maidName: "ルナ", records: [] }; } }
 function saveData() { localStorage.setItem(STORAGE_KEY, JSON.stringify(data)); }
 function dayKey(value) { const d = new Date(value); return `${d.getFullYear()}-${d.getMonth()}-${d.getDate()}`; }
 function todayKey() { return dayKey(Date.now()); }
@@ -33,16 +33,12 @@ function render() {
   document.querySelector("#streak-count").textContent = streak();
   document.querySelector("#progress-bar").style.width = `${Math.min(100, current / data.goal * 100)}%`;
   document.querySelector("#mission-text").textContent = `スクワットを${data.goal}回行う（${Math.min(current, data.goal)} / ${data.goal}）`;
-  const reminderDue = data.remindersEnabled && current === 0 && new Date().toTimeString().slice(0, 5) >= data.reminderTime;
-  document.querySelector("#encouragement").textContent = reminderDue ? "今日の一杯、まだ残ってるよ。少しだけ動いていこう。" : achieved ? "目標クリア。いい夜にしよう。" : current ? `いいペース。あと${data.goal - current}回で今日の目標だよ。` : "おつかれさま。今日はどれくらいやる？";
+  document.querySelector("#encouragement").textContent = achieved ? "目標クリア。いい夜にしよう。" : current ? `いいペース。あと${data.goal - current}回で今日の目標だよ。` : "おつかれさま。今日はどれくらいやる？";
   document.querySelector("#achievement-badge").hidden = !achieved;
   document.querySelector("#collection-total").textContent = all;
   document.querySelector("#goal-input").value = data.goal;
   document.querySelector("#maid-name").textContent = `スタッフ：${data.maidName}`;
   document.querySelector("#maid-name-input").value = data.maidName;
-  document.querySelector("#reminder-enabled").checked = data.remindersEnabled;
-  document.querySelector("#reminder-time").value = data.reminderTime;
-  document.querySelector("#reminder-options").hidden = !data.remindersEnabled;
   renderHistory(); renderCollection(all);
 }
 function renderHistory() {
@@ -69,16 +65,6 @@ function showPage(page) {
   document.querySelectorAll(".tab").forEach(tab => tab.classList.toggle("active", tab.dataset.page === page));
 }
 function toast(message) { const element = document.querySelector("#toast"); element.textContent = message; element.classList.add("show"); setTimeout(() => element.classList.remove("show"), 2600); }
-function sendReminderNotification() {
-  if (!data.remindersEnabled || todayTotal() > 0 || data.lastReminderDay === todayKey() || new Date().toTimeString().slice(0, 5) < data.reminderTime) return;
-  data.lastReminderDay = todayKey(); saveData();
-  if ("Notification" in window && Notification.permission === "granted" && navigator.serviceWorker) navigator.serviceWorker.ready.then(registration => registration.showNotification("SQUAT BAR", { body: "今日の一杯、まだ残ってるよ。スクワットを始めよう。", icon: "icon.svg", tag: "daily-squat-reminder" }));
-}
-function scheduleReminder() {
-  clearTimeout(window.reminderTimer);
-  if (!data.remindersEnabled || todayTotal() > 0) return;
-  const [hours, minutes] = data.reminderTime.split(":").map(Number); const when = new Date(); when.setHours(hours, minutes, 0, 0); if (when <= new Date()) sendReminderNotification(); else window.reminderTimer = setTimeout(sendReminderNotification, when - new Date());
-}
 
 document.querySelectorAll(".tab").forEach(tab => tab.onclick = () => showPage(tab.dataset.page));
 function localDateTimeValue(timestamp) { const date = new Date(timestamp); const offset = date.getTimezoneOffset() * 60_000; return new Date(date - offset).toISOString().slice(0, 16); }
@@ -103,9 +89,6 @@ document.querySelector("#goal-minus").onclick = () => { data.goal = Math.max(5, 
 document.querySelector("#goal-plus").onclick = () => { data.goal = Math.min(500, data.goal + 5); saveData(); render(); };
 document.querySelector("#goal-input").addEventListener("change", event => { data.goal = Math.min(500, Math.max(5, Number.parseInt(event.target.value, 10) || 5)); saveData(); render(); });
 document.querySelector("#maid-name-input").addEventListener("change", event => { data.maidName = event.target.value.trim().slice(0, 20) || "ルナ"; saveData(); render(); });
-document.querySelector("#reminder-enabled").addEventListener("change", event => { data.remindersEnabled = event.target.checked; saveData(); render(); scheduleReminder(); });
-document.querySelector("#reminder-time").addEventListener("change", event => { data.reminderTime = event.target.value || "20:00"; saveData(); render(); scheduleReminder(); });
-document.querySelector("#notification-permission-button").onclick = async () => { if (!("Notification" in window)) return toast("このブラウザでは通知を利用できません。"); const result = await Notification.requestPermission(); toast(result === "granted" ? "通知を許可しました。" : "通知は許可されていません。"); };
+document.querySelector("#add-reminder-button").onclick = async () => { const reminder = { title: "SQUAT BAR", text: "スクワットを記録する", url: location.href }; if (!navigator.share) return toast("iPhoneのSafariから開くとリマインダーへ追加できます。"); try { await navigator.share(reminder); } catch (error) { if (error.name !== "AbortError") toast("共有メニューを開けませんでした。"); } };
 if ("serviceWorker" in navigator) navigator.serviceWorker.register("service-worker.js");
 render();
-scheduleReminder();

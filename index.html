@@ -26,8 +26,8 @@
           <div class="character-placeholder" aria-label="キャラクターイラストの表示場所"><span>♙</span><small>ILLUSTRATION<br>COMING SOON</small></div>
           <div class="counter-edge" aria-hidden="true"></div>
           <div class="bar-stools" aria-hidden="true"><span></span><span></span><span></span></div>
-          <div class="speech-bubble"><p id="maid-name" class="maid-name">スタッフ：ルナ</p><p id="encouragement" class="maid-message"></p><span id="achievement-badge" class="achievement-badge" hidden>✦ 目標クリア</span></div>
         </article>
+        <article class="conversation-window"><p id="maid-name" class="maid-name">スタッフ：ルナ</p><p id="encouragement" class="maid-message"></p><span id="achievement-badge" class="achievement-badge" hidden>✦ 目標クリア</span></article>
 
         <article class="progress-card">
           <div class="progress-label"><span>今日のスクワット</span><div class="progress-actions"><button id="add-record-button" class="progress-action pencil-action" aria-label="スクワットを記録">✎</button><button id="share-button" class="progress-action x-action" aria-label="今日の記録をXへ投稿">𝕏</button><strong id="today-count">0 / 30 回</strong></div></div>
@@ -56,7 +56,7 @@
       <section id="settings-page" class="page" aria-label="設定">
         <article class="settings-card"><label for="maid-name-input">スタッフの名前</label><input id="maid-name-input" class="settings-input" maxlength="20" value="ルナ" placeholder="例：ルナ" /><p class="input-hint">応援メッセージやスタッフ一覧に反映されます。</p></article>
         <article class="settings-card"><label for="goal-input">1日の目標回数</label><div class="goal-control"><button id="goal-minus" aria-label="目標を減らす">−</button><input id="goal-input" type="number" inputmode="numeric" min="5" max="500" step="5" value="30" aria-label="1日の目標回数" /><span>回</span><button id="goal-plus" aria-label="目標を増やす">＋</button></div></article>
-        <article class="settings-card"><label class="toggle-row" for="reminder-enabled"><span>リマインド</span><input id="reminder-enabled" type="checkbox" role="switch" /><i></i></label><div id="reminder-options" class="reminder-options"><label for="reminder-time">リマインド時刻</label><input id="reminder-time" type="time" value="20:00" /><button id="notification-permission-button" class="secondary-button">通知を許可する</button><p class="input-hint">アプリを開いている間は設定時刻に通知します。閉じている間の通知には配信サーバーの接続が必要です。</p></div></article>
+        <article class="settings-card"><strong>リマインダー</strong><p class="input-hint">共有メニューから「リマインダー」を選び、通知時刻を設定できます。</p><button id="add-reminder-button" class="secondary-button">iPhoneのリマインダーに追加</button></article>
         <article class="settings-card about"><strong>SQUAT BAR</strong><p>カウンター越しのひとことと、毎日の小さな積み重ねを。</p></article>
       </section>
     </main>
