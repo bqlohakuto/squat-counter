@@ -12,6 +12,7 @@ const REWARDS = [
 let data = loadData();
 let inputCount = 10;
 let editingRecordId = null;
+let motionState = null;
 
 function loadData() { try { return { goal: 30, maidName: "ルナ", records: [], ...JSON.parse(localStorage.getItem(STORAGE_KEY)) }; } catch { return { goal: 30, maidName: "ルナ", records: [] }; } }
 function saveData() { localStorage.setItem(STORAGE_KEY, JSON.stringify(data)); }
@@ -70,6 +71,8 @@ function toast(message) { const element = document.querySelector("#toast"); elem
 document.querySelectorAll(".tab").forEach(tab => tab.onclick = () => showPage(tab.dataset.page));
 function localDateTimeValue(timestamp) { const date = new Date(timestamp); const offset = date.getTimezoneOffset() * 60_000; return new Date(date - offset).toISOString().slice(0, 16); }
 function openRecordDialog(record = null) {
+  stopMotionCounter();
+  motionState = null; updateMotionUi(); setMotionStatus("開始するとセンサーへのアクセス許可を求めます。");
   editingRecordId = record?.id ?? null;
   setInputCount(record?.count ?? 10);
   document.querySelector("#memo-input").value = record?.memo ?? "";
@@ -85,6 +88,53 @@ function setInputCount(value) { inputCount = normalizedCount(value); document.qu
 document.querySelector("#count-minus").onclick = () => setInputCount(inputCount - 5);
 document.querySelector("#count-plus").onclick = () => setInputCount(inputCount + 5);
 document.querySelector("#count-input").addEventListener("change", event => setInputCount(event.target.value));
+function setMotionStatus(message) { document.querySelector("#motion-status").textContent = message; }
+function updateMotionUi() {
+  const active = Boolean(motionState?.active);
+  document.querySelector("#motion-count").textContent = motionState?.count ?? 0;
+  document.querySelector("#motion-start-button").hidden = active;
+  document.querySelector("#motion-stop-button").hidden = !active;
+}
+function handleDeviceOrientation(event) {
+  if (!motionState?.active || !Number.isFinite(event.beta) || !Number.isFinite(event.gamma)) return;
+  const reading = { beta: event.beta, gamma: event.gamma };
+  if (!motionState.baseline) {
+    motionState.samples.push(reading);
+    if (motionState.samples.length < 12) return;
+    const samples = motionState.samples;
+    motionState.baseline = { beta: samples.reduce((sum, item) => sum + item.beta, 0) / samples.length, gamma: samples.reduce((sum, item) => sum + item.gamma, 0) / samples.length };
+    setMotionStatus("準備完了。しゃがんでから、まっすぐ立つと1回です。");
+    return;
+  }
+  const tilt = Math.hypot(reading.beta - motionState.baseline.beta, reading.gamma - motionState.baseline.gamma);
+  if (!motionState.isDown && tilt >= 16) { motionState.isDown = true; setMotionStatus("立ち上がりを待っています。"); return; }
+  if (motionState.isDown && tilt <= 7 && Date.now() - motionState.lastCountAt >= 650) {
+    motionState.isDown = false; motionState.lastCountAt = Date.now(); motionState.count += 1;
+    inputCount = motionState.count; document.querySelector("#count-input").value = inputCount;
+    updateMotionUi(); setMotionStatus(`${motionState.count}回。いいペースです。`);
+  }
+}
+function stopMotionCounter() {
+  if (motionState?.active) window.removeEventListener("deviceorientation", handleDeviceOrientation);
+  if (motionState) motionState.active = false;
+  updateMotionUi();
+}
+async function startMotionCounter() {
+  if (!("DeviceOrientationEvent" in window)) return setMotionStatus("この端末では傾きセンサーを利用できません。手入力をご利用ください。");
+  try {
+    if (typeof DeviceOrientationEvent.requestPermission === "function") {
+      const permission = await DeviceOrientationEvent.requestPermission();
+      if (permission !== "granted") return setMotionStatus("センサーの利用が許可されませんでした。Safariの設定をご確認ください。");
+    }
+    motionState = { active: true, baseline: null, samples: [], count: 0, isDown: false, lastCountAt: 0 };
+    inputCount = 0; document.querySelector("#count-input").value = 0;
+    updateMotionUi(); setMotionStatus("まっすぐ立ったまま、姿勢を確認しています…");
+    window.addEventListener("deviceorientation", handleDeviceOrientation);
+  } catch { setMotionStatus("センサーを開始できませんでした。HTTPSのSafariからお試しください。"); }
+}
+document.querySelector("#motion-start-button").onclick = startMotionCounter;
+document.querySelector("#motion-stop-button").onclick = () => { stopMotionCounter(); setMotionStatus(motionState?.count ? `${motionState.count}回を入力欄へ反映しました。` : "回数が検出されませんでした。手入力で調整できます。"); };
+document.querySelector("#record-dialog").addEventListener("close", stopMotionCounter);
 document.querySelector("#record-form").addEventListener("submit", event => { event.preventDefault(); setInputCount(document.querySelector("#count-input").value); const before = todayTotal(); const createdAt = new Date(document.querySelector("#performed-at-input").value).getTime() || Date.now(); const memo = document.querySelector("#memo-input").value.trim(); const existing = data.records.find(record => record.id === editingRecordId); if (existing) { existing.count = inputCount; existing.memo = memo; existing.createdAt = createdAt; } else { data.records.push({ id: crypto.randomUUID(), count: inputCount, memo, createdAt }); } saveData(); document.querySelector("#record-dialog").close(); document.querySelector("#memo-input").value = ""; const wasEditing = editingRecordId !== null; editingRecordId = null; render(); if (!wasEditing) toast(before < data.goal && todayTotal() >= data.goal ? `✦ 目標クリア。${data.maidName}から一杯どうぞ。` : `${data.maidName}「${inputCount}回、いいね。」`); });
 document.querySelector("#goal-minus").onclick = () => { data.goal = Math.max(5, data.goal - 5); saveData(); render(); };
 document.querySelector("#goal-plus").onclick = () => { data.goal = Math.min(500, data.goal + 5); saveData(); render(); };

@@ -73,6 +73,11 @@
         <div class="dialog-header"><h2 id="record-dialog-title">記録する</h2><button class="close-button" value="cancel" aria-label="閉じる">×</button></div>
         <label class="form-label" for="count-input">今回のスクワット</label>
         <div class="count-picker"><button type="button" id="count-minus" aria-label="回数を減らす">−</button><input id="count-input" type="number" inputmode="numeric" min="1" max="500" value="10" aria-label="スクワット回数" /><span>回</span><button type="button" id="count-plus" aria-label="回数を増やす">＋</button></div>
+        <section class="motion-counter" aria-labelledby="motion-title">
+          <div><strong id="motion-title">傾きで数える</strong><p>iPhoneを胸元または前ポケットで固定し、まっすぐ立って開始してください。</p></div>
+          <div class="motion-controls"><strong id="motion-count">0</strong><span>回</span><button type="button" id="motion-start-button" class="motion-button">傾きで開始</button><button type="button" id="motion-stop-button" class="motion-button motion-stop" hidden>終了して入力</button></div>
+          <p id="motion-status" class="motion-status" role="status" aria-live="polite">開始するとセンサーへのアクセス許可を求めます。</p>
+        </section>
         <label class="form-label" for="performed-at-input">日時</label>
         <input id="performed-at-input" type="datetime-local" />
         <label class="form-label" for="memo-input">メモ（任意）</label>
