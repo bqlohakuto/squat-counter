@@ -3,31 +3,31 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
-    <meta name="theme-color" content="#6e4bc6" />
+    <meta name="theme-color" content="#211918" />
     <meta name="apple-mobile-web-app-capable" content="yes" />
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
-    <meta name="apple-mobile-web-app-title" content="スクワットメイド" />
+    <meta name="apple-mobile-web-app-title" content="SQUAT BAR" />
     <link rel="manifest" href="manifest.webmanifest" />
     <link rel="apple-touch-icon" href="icon.svg" />
     <link rel="stylesheet" href="style.css" />
-    <title>スクワットメイド</title>
+    <title>SQUAT BAR</title>
   </head>
   <body>
     <main class="app-shell">
       <header class="app-header">
-        <p class="eyebrow">SQUAT MAID</p>
-        <h1 id="page-title">おかえりなさい</h1>
+        <p class="eyebrow">SQUAT BAR</p>
+        <h1 id="page-title">カウンター</h1>
         <button class="icon-button" id="settings-button" aria-label="設定を開く">⚙</button>
       </header>
 
       <section id="home-page" class="page active" aria-label="ホーム">
-        <article class="maid-card">
-          <div class="maid-portrait" aria-hidden="true">🌙</div>
-          <div>
-            <p id="maid-name" class="maid-name">メイドのルナ</p>
-            <p id="encouragement" class="maid-message"></p>
-            <span id="achievement-badge" class="achievement-badge" hidden>✦ 目標達成</span>
-          </div>
+        <article class="bar-card">
+          <div class="bar-lights" aria-hidden="true"><i></i><i></i><i></i><i></i><i></i></div>
+          <div class="bar-backdrop" aria-hidden="true"><span>◒</span><span>◇</span><span>◐</span></div>
+          <div class="character-placeholder" aria-label="キャラクターイラストの表示場所"><span>♙</span><small>ILLUSTRATION<br>COMING SOON</small></div>
+          <div class="counter-edge" aria-hidden="true"></div>
+          <div class="bar-stools" aria-hidden="true"><span></span><span></span><span></span></div>
+          <div class="speech-bubble"><p id="maid-name" class="maid-name">スタッフ：ルナ</p><p id="encouragement" class="maid-message"></p><span id="achievement-badge" class="achievement-badge" hidden>✦ 目標クリア</span></div>
         </article>
 
         <article class="progress-card">
@@ -51,21 +51,21 @@
 
       <section id="collection-page" class="page" aria-label="屋敷">
         <p class="collection-summary">累計 <strong id="collection-total">0</strong> 回</p>
-        <h2>メイドたち</h2><div id="maid-list" class="collection-list"></div>
+        <h2>スタッフ</h2><div id="maid-list" class="collection-list"></div>
         <h2>ごほうび</h2><div id="reward-list" class="collection-list"></div>
       </section>
 
       <section id="settings-page" class="page" aria-label="設定">
-        <article class="settings-card"><label for="maid-name-input">メイドの名前</label><input id="maid-name-input" class="settings-input" maxlength="20" value="ルナ" placeholder="例：ルナ" /><p class="input-hint">応援メッセージやコレクションに反映されます。</p></article>
+        <article class="settings-card"><label for="maid-name-input">スタッフの名前</label><input id="maid-name-input" class="settings-input" maxlength="20" value="ルナ" placeholder="例：ルナ" /><p class="input-hint">応援メッセージやスタッフ一覧に反映されます。</p></article>
         <article class="settings-card"><label for="goal-input">1日の目標回数</label><div class="goal-control"><button id="goal-minus" aria-label="目標を減らす">−</button><input id="goal-input" type="number" inputmode="numeric" min="5" max="500" step="5" value="30" aria-label="1日の目標回数" /><span>回</span><button id="goal-plus" aria-label="目標を増やす">＋</button></div></article>
-        <article class="settings-card about"><strong>スクワットメイド</strong><p>毎日の小さな積み重ねを、メイドたちと楽しみましょう。</p></article>
+        <article class="settings-card about"><strong>SQUAT BAR</strong><p>カウンター越しのひとことと、毎日の小さな積み重ねを。</p></article>
       </section>
     </main>
 
     <nav class="tab-bar" aria-label="メインメニュー">
       <button class="tab active" data-page="home"><span>⌂</span>ホーム</button>
       <button class="tab" data-page="history"><span>▣</span>履歴</button>
-      <button class="tab" data-page="collection"><span>✦</span>屋敷</button>
+      <button class="tab" data-page="collection"><span>✦</span>お店</button>
     </nav>
 
     <dialog id="record-dialog">
@@ -75,7 +75,7 @@
         <div class="count-picker"><button type="button" id="count-minus" aria-label="回数を減らす">−</button><input id="count-input" type="number" inputmode="numeric" min="1" max="500" value="10" aria-label="スクワット回数" /><span>回</span><button type="button" id="count-plus" aria-label="回数を増やす">＋</button></div>
         <label class="form-label" for="memo-input">メモ（任意）</label>
         <input id="memo-input" maxlength="80" placeholder="例：朝の運動" />
-        <p class="maid-tip">ルナ「無理は禁物です。きれいな姿勢でいきましょう！」</p>
+        <p class="maid-tip">「無理はしないで。フォームを整えて、気持ちよくいこう。」</p>
         <button class="primary-button" value="default">保存する</button>
       </form>
     </dialog>

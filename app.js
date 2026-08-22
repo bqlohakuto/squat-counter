@@ -1,8 +1,8 @@
 const STORAGE_KEY = "squat-maid-data-v1";
 const MAIDS = [
-  { name: "ルナ", role: "あなた専属の応援メイド", icon: "🌙", threshold: 0 },
-  { name: "ココ", role: "元気なトレーニング係", icon: "🌼", threshold: 500 },
-  { name: "ユイ", role: "記録が得意なメイド", icon: "📘", threshold: 1500 }
+  { name: "ルナ", role: "カウンター担当", icon: "🍸", threshold: 0 },
+  { name: "ココ", role: "にぎやかなホールスタッフ", icon: "🍒", threshold: 500 },
+  { name: "ユイ", role: "記録を見守るスタッフ", icon: "🥃", threshold: 1500 }
 ];
 const REWARDS = [
   { name: "お祝いのリボン", role: "累計100回で解放", icon: "🎀", threshold: 100 },
@@ -32,11 +32,11 @@ function render() {
   document.querySelector("#streak-count").textContent = streak();
   document.querySelector("#progress-bar").style.width = `${Math.min(100, current / data.goal * 100)}%`;
   document.querySelector("#mission-text").textContent = `スクワットを${data.goal}回行う（${Math.min(current, data.goal)} / ${data.goal}）`;
-  document.querySelector("#encouragement").textContent = achieved ? "本日の目標達成です！ とっても素敵です、ご主人さま。" : current ? `あと${data.goal - current}回です。わたくしと一緒にまいりましょう。` : "本日もお待ちしておりました。小さな一歩から始めましょう。";
+  document.querySelector("#encouragement").textContent = achieved ? "目標クリア。いい夜にしよう。" : current ? `いいペース。あと${data.goal - current}回で今日の目標だよ。` : "おつかれさま。今日はどれくらいやる？";
   document.querySelector("#achievement-badge").hidden = !achieved;
   document.querySelector("#collection-total").textContent = all;
   document.querySelector("#goal-input").value = data.goal;
-  document.querySelector("#maid-name").textContent = `メイドの${data.maidName}`;
+  document.querySelector("#maid-name").textContent = `スタッフ：${data.maidName}`;
   document.querySelector("#maid-name-input").value = data.maidName;
   renderHistory(); renderCollection(all);
 }
@@ -57,7 +57,7 @@ function renderUnlocks(selector, items, all, usesMaidName = false) {
 }
 function escapeHtml(text) { const div = document.createElement("div"); div.textContent = text; return div.innerHTML; }
 function showPage(page) {
-  const titles = { home: "おかえりなさい", history: "記録の履歴", collection: "屋敷のコレクション", settings: "設定" };
+  const titles = { home: "カウンター", history: "記録の履歴", collection: "お店のコレクション", settings: "設定" };
   document.querySelectorAll(".page").forEach(el => el.classList.remove("active")); document.querySelector(`#${page}-page`).classList.add("active");
   document.querySelector("#page-title").textContent = titles[page];
   document.querySelector("#settings-button").hidden = page === "settings";
@@ -73,7 +73,7 @@ function setInputCount(value) { inputCount = normalizedCount(value); document.qu
 document.querySelector("#count-minus").onclick = () => setInputCount(inputCount - 5);
 document.querySelector("#count-plus").onclick = () => setInputCount(inputCount + 5);
 document.querySelector("#count-input").addEventListener("change", event => setInputCount(event.target.value));
-document.querySelector("#record-form").addEventListener("submit", event => { event.preventDefault(); setInputCount(document.querySelector("#count-input").value); const before = todayTotal(); data.records.push({ id: crypto.randomUUID(), count: inputCount, memo: document.querySelector("#memo-input").value.trim(), createdAt: Date.now() }); saveData(); document.querySelector("#record-dialog").close(); document.querySelector("#memo-input").value = ""; render(); toast(before < data.goal && todayTotal() >= data.goal ? `✦ 目標達成！ ${data.maidName}がお祝いしています` : `${data.maidName}「${inputCount}回、立派です！」`); });
+document.querySelector("#record-form").addEventListener("submit", event => { event.preventDefault(); setInputCount(document.querySelector("#count-input").value); const before = todayTotal(); data.records.push({ id: crypto.randomUUID(), count: inputCount, memo: document.querySelector("#memo-input").value.trim(), createdAt: Date.now() }); saveData(); document.querySelector("#record-dialog").close(); document.querySelector("#memo-input").value = ""; render(); toast(before < data.goal && todayTotal() >= data.goal ? `✦ 目標クリア。${data.maidName}から一杯どうぞ。` : `${data.maidName}「${inputCount}回、いいね。」`); });
 document.querySelector("#goal-minus").onclick = () => { data.goal = Math.max(5, data.goal - 5); saveData(); render(); };
 document.querySelector("#goal-plus").onclick = () => { data.goal = Math.min(500, data.goal + 5); saveData(); render(); };
 document.querySelector("#goal-input").addEventListener("change", event => { data.goal = Math.min(500, Math.max(5, Number.parseInt(event.target.value, 10) || 5)); saveData(); render(); });

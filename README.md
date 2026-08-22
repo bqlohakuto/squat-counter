@@ -1,6 +1,6 @@
 # squat-counter
 
-メイドキャラクターと一緒にスクワットを続ける、iPhone向け記録・育成Webアプリです。Windowsだけで開発でき、iPhoneのSafariから利用できます。
+バーカウンターのスタッフと一緒にスクワットを続ける、iPhone向け記録・育成Webアプリです。Windowsだけで開発でき、iPhoneのSafariから利用できます。
 
 ## 初期MVP
 
