@@ -35,7 +35,7 @@ function render() {
   document.querySelector("#encouragement").textContent = achieved ? "本日の目標達成です！ とっても素敵です、ご主人さま。" : current ? `あと${data.goal - current}回です。わたくしと一緒にまいりましょう。` : "本日もお待ちしておりました。小さな一歩から始めましょう。";
   document.querySelector("#achievement-badge").hidden = !achieved;
   document.querySelector("#collection-total").textContent = all;
-  document.querySelector("#goal-output").textContent = `${data.goal} 回`;
+  document.querySelector("#goal-input").value = data.goal;
   renderHistory(); renderCollection(all);
 }
 function renderHistory() {
@@ -66,10 +66,14 @@ function toast(message) { const element = document.querySelector("#toast"); elem
 document.querySelectorAll(".tab").forEach(tab => tab.onclick = () => showPage(tab.dataset.page));
 document.querySelector("#settings-button").onclick = () => showPage("settings");
 document.querySelector("#add-record-button").onclick = () => document.querySelector("#record-dialog").showModal();
-document.querySelector("#count-minus").onclick = () => { inputCount = Math.max(1, inputCount - 5); document.querySelector("#count-output").textContent = `${inputCount} 回`; };
-document.querySelector("#count-plus").onclick = () => { inputCount = Math.min(500, inputCount + 5); document.querySelector("#count-output").textContent = `${inputCount} 回`; };
-document.querySelector("#record-form").addEventListener("submit", event => { event.preventDefault(); const before = todayTotal(); data.records.push({ id: crypto.randomUUID(), count: inputCount, memo: document.querySelector("#memo-input").value.trim(), createdAt: Date.now() }); saveData(); document.querySelector("#record-dialog").close(); document.querySelector("#memo-input").value = ""; render(); toast(before < data.goal && todayTotal() >= data.goal ? "✦ 目標達成！ ルナがお祝いしています" : `ルナ「${inputCount}回、立派です！」`); });
+function normalizedCount(value) { return Math.min(500, Math.max(1, Number.parseInt(value, 10) || 1)); }
+function setInputCount(value) { inputCount = normalizedCount(value); document.querySelector("#count-input").value = inputCount; }
+document.querySelector("#count-minus").onclick = () => setInputCount(inputCount - 5);
+document.querySelector("#count-plus").onclick = () => setInputCount(inputCount + 5);
+document.querySelector("#count-input").addEventListener("change", event => setInputCount(event.target.value));
+document.querySelector("#record-form").addEventListener("submit", event => { event.preventDefault(); setInputCount(document.querySelector("#count-input").value); const before = todayTotal(); data.records.push({ id: crypto.randomUUID(), count: inputCount, memo: document.querySelector("#memo-input").value.trim(), createdAt: Date.now() }); saveData(); document.querySelector("#record-dialog").close(); document.querySelector("#memo-input").value = ""; render(); toast(before < data.goal && todayTotal() >= data.goal ? "✦ 目標達成！ ルナがお祝いしています" : `ルナ「${inputCount}回、立派です！」`); });
 document.querySelector("#goal-minus").onclick = () => { data.goal = Math.max(5, data.goal - 5); saveData(); render(); };
 document.querySelector("#goal-plus").onclick = () => { data.goal = Math.min(500, data.goal + 5); saveData(); render(); };
+document.querySelector("#goal-input").addEventListener("change", event => { data.goal = Math.min(500, Math.max(5, Number.parseInt(event.target.value, 10) || 5)); saveData(); render(); });
 if ("serviceWorker" in navigator) navigator.serviceWorker.register("service-worker.js");
 render();

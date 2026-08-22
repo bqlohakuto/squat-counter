@@ -56,7 +56,7 @@
       </section>
 
       <section id="settings-page" class="page" aria-label="設定">
-        <article class="settings-card"><label for="goal-input">1日の目標回数</label><div class="goal-control"><button id="goal-minus" aria-label="目標を減らす">−</button><output id="goal-output">30 回</output><button id="goal-plus" aria-label="目標を増やす">＋</button></div></article>
+        <article class="settings-card"><label for="goal-input">1日の目標回数</label><div class="goal-control"><button id="goal-minus" aria-label="目標を減らす">−</button><input id="goal-input" type="number" inputmode="numeric" min="5" max="500" step="5" value="30" aria-label="1日の目標回数" /><span>回</span><button id="goal-plus" aria-label="目標を増やす">＋</button></div></article>
         <article class="settings-card about"><strong>スクワットメイド</strong><p>毎日の小さな積み重ねを、メイドたちと楽しみましょう。</p></article>
       </section>
     </main>
@@ -71,7 +71,7 @@
       <form id="record-form" method="dialog">
         <div class="dialog-header"><h2>記録する</h2><button class="close-button" value="cancel" aria-label="閉じる">×</button></div>
         <label class="form-label" for="count-input">今回のスクワット</label>
-        <div class="count-picker"><button type="button" id="count-minus">−</button><output id="count-output">10 回</output><button type="button" id="count-plus">＋</button></div>
+        <div class="count-picker"><button type="button" id="count-minus" aria-label="回数を減らす">−</button><input id="count-input" type="number" inputmode="numeric" min="1" max="500" value="10" aria-label="スクワット回数" /><span>回</span><button type="button" id="count-plus" aria-label="回数を増やす">＋</button></div>
         <label class="form-label" for="memo-input">メモ（任意）</label>
         <input id="memo-input" maxlength="80" placeholder="例：朝の運動" />
         <p class="maid-tip">ルナ「無理は禁物です。きれいな姿勢でいきましょう！」</p>
