@@ -17,7 +17,6 @@
       <header class="app-header">
         <p class="eyebrow">SQUAT BAR</p>
         <h1 id="page-title">カウンター</h1>
-        <button class="icon-button" id="settings-button" aria-label="設定を開く">⚙</button>
       </header>
 
       <section id="home-page" class="page active" aria-label="ホーム">
@@ -31,13 +30,13 @@
         </article>
 
         <article class="progress-card">
-          <div class="progress-label"><span>今日のスクワット</span><div class="progress-actions"><button id="add-record-button" class="progress-action" aria-label="スクワットを記録">＋</button><button id="share-button" class="progress-action x-action" aria-label="今日の記録をXへ投稿">𝕏</button><strong id="today-count">0 / 30 回</strong></div></div>
+          <div class="progress-label"><span>今日のスクワット</span><div class="progress-actions"><button id="add-record-button" class="progress-action pencil-action" aria-label="スクワットを記録">✎</button><button id="share-button" class="progress-action x-action" aria-label="今日の記録をXへ投稿">𝕏</button><strong id="today-count">0 / 30 回</strong></div></div>
           <div class="progress-track"><div id="progress-bar" class="progress-bar"></div></div>
         </article>
 
         <div class="stats-grid">
-          <article class="stat-card"><span class="stat-icon">🔥</span><strong id="streak-count">0</strong><span>連続達成日</span></article>
-          <article class="stat-card"><span class="stat-icon">🏋️</span><strong id="total-count">0</strong><span>累計スクワット</span></article>
+          <article class="stat-card"><strong id="streak-count">0</strong><span>連続達成日</span></article>
+          <article class="stat-card"><strong id="total-count">0</strong><span>累計スクワット</span></article>
         </div>
 
         <article class="mission-card"><span>⚑</span><div><strong>本日のミッション</strong><p id="mission-text"></p></div></article>
@@ -66,17 +65,20 @@
       <button class="tab active" data-page="home"><span>⌂</span>ホーム</button>
       <button class="tab" data-page="history"><span>▣</span>履歴</button>
       <button class="tab" data-page="collection"><span>✦</span>お店</button>
+      <button class="tab" data-page="settings"><span>⚙</span>設定</button>
     </nav>
 
     <dialog id="record-dialog">
       <form id="record-form" method="dialog">
-        <div class="dialog-header"><h2>記録する</h2><button class="close-button" value="cancel" aria-label="閉じる">×</button></div>
+        <div class="dialog-header"><h2 id="record-dialog-title">記録する</h2><button class="close-button" value="cancel" aria-label="閉じる">×</button></div>
         <label class="form-label" for="count-input">今回のスクワット</label>
         <div class="count-picker"><button type="button" id="count-minus" aria-label="回数を減らす">−</button><input id="count-input" type="number" inputmode="numeric" min="1" max="500" value="10" aria-label="スクワット回数" /><span>回</span><button type="button" id="count-plus" aria-label="回数を増やす">＋</button></div>
+        <label class="form-label" for="performed-at-input">日時</label>
+        <input id="performed-at-input" type="datetime-local" />
         <label class="form-label" for="memo-input">メモ（任意）</label>
         <input id="memo-input" maxlength="80" placeholder="例：朝の運動" />
         <p class="maid-tip">「無理はしないで。フォームを整えて、気持ちよくいこう。」</p>
-        <button class="primary-button" value="default">保存する</button>
+        <button id="record-save-button" class="primary-button" value="default">保存する</button>
       </form>
     </dialog>
     <div id="toast" class="toast" role="status" aria-live="polite"></div>

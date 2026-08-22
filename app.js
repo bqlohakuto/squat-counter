@@ -11,6 +11,7 @@ const REWARDS = [
 ];
 let data = loadData();
 let inputCount = 10;
+let editingRecordId = null;
 
 function loadData() { try { return { goal: 30, maidName: "ルナ", remindersEnabled: false, reminderTime: "20:00", lastReminderDay: "", records: [], ...JSON.parse(localStorage.getItem(STORAGE_KEY)) }; } catch { return { goal: 30, maidName: "ルナ", remindersEnabled: false, reminderTime: "20:00", lastReminderDay: "", records: [] }; } }
 function saveData() { localStorage.setItem(STORAGE_KEY, JSON.stringify(data)); }
@@ -49,8 +50,9 @@ function renderHistory() {
   list.innerHTML = ""; empty.hidden = data.records.length > 0;
   [...data.records].sort((a,b) => b.createdAt - a.createdAt).forEach(record => {
     const d = new Date(record.createdAt); const item = document.createElement("article"); item.className = "history-item";
-    item.innerHTML = `<div class="history-icon">🏋️</div><div class="history-copy"><strong>${record.count} 回</strong><span>${d.toLocaleString("ja-JP", {month:"numeric",day:"numeric",hour:"2-digit",minute:"2-digit"})}${record.memo ? ` · ${escapeHtml(record.memo)}` : ""}</span></div><button class="delete-button" aria-label="記録を削除">削除</button>`;
-    item.querySelector("button").onclick = () => { data.records = data.records.filter(item => item.id !== record.id); saveData(); render(); };
+    item.innerHTML = `<div class="history-icon">🏋️</div><div class="history-copy"><strong>${record.count} 回</strong><span>${d.toLocaleString("ja-JP", {month:"numeric",day:"numeric",hour:"2-digit",minute:"2-digit"})}${record.memo ? ` · ${escapeHtml(record.memo)}` : ""}</span></div><div class="history-actions"><button class="edit-button" aria-label="記録を編集">編集</button><button class="delete-button" aria-label="記録を削除">削除</button></div>`;
+    item.querySelector(".edit-button").onclick = () => openRecordDialog(record);
+    item.querySelector(".delete-button").onclick = () => { data.records = data.records.filter(item => item.id !== record.id); saveData(); render(); };
     list.append(item);
   });
 }
@@ -64,7 +66,6 @@ function showPage(page) {
   const titles = { home: "カウンター", history: "記録の履歴", collection: "お店のコレクション", settings: "設定" };
   document.querySelectorAll(".page").forEach(el => el.classList.remove("active")); document.querySelector(`#${page}-page`).classList.add("active");
   document.querySelector("#page-title").textContent = titles[page];
-  document.querySelector("#settings-button").hidden = page === "settings";
   document.querySelectorAll(".tab").forEach(tab => tab.classList.toggle("active", tab.dataset.page === page));
 }
 function toast(message) { const element = document.querySelector("#toast"); element.textContent = message; element.classList.add("show"); setTimeout(() => element.classList.remove("show"), 2600); }
@@ -80,15 +81,24 @@ function scheduleReminder() {
 }
 
 document.querySelectorAll(".tab").forEach(tab => tab.onclick = () => showPage(tab.dataset.page));
-document.querySelector("#settings-button").onclick = () => showPage("settings");
-document.querySelector("#add-record-button").onclick = () => document.querySelector("#record-dialog").showModal();
+function localDateTimeValue(timestamp) { const date = new Date(timestamp); const offset = date.getTimezoneOffset() * 60_000; return new Date(date - offset).toISOString().slice(0, 16); }
+function openRecordDialog(record = null) {
+  editingRecordId = record?.id ?? null;
+  setInputCount(record?.count ?? 10);
+  document.querySelector("#memo-input").value = record?.memo ?? "";
+  document.querySelector("#performed-at-input").value = localDateTimeValue(record?.createdAt ?? Date.now());
+  document.querySelector("#record-dialog-title").textContent = record ? "記録を編集" : "記録する";
+  document.querySelector("#record-save-button").textContent = record ? "変更を保存" : "保存する";
+  document.querySelector("#record-dialog").showModal();
+}
+document.querySelector("#add-record-button").onclick = () => openRecordDialog();
 document.querySelector("#share-button").onclick = () => { const message = `今日はスクワットを${todayTotal()}回やった。\n#SQUATBAR #スクワット`; window.open(`https://x.com/intent/post?text=${encodeURIComponent(message)}`, "_blank", "noopener,noreferrer"); };
 function normalizedCount(value) { return Math.min(500, Math.max(1, Number.parseInt(value, 10) || 1)); }
 function setInputCount(value) { inputCount = normalizedCount(value); document.querySelector("#count-input").value = inputCount; }
 document.querySelector("#count-minus").onclick = () => setInputCount(inputCount - 5);
 document.querySelector("#count-plus").onclick = () => setInputCount(inputCount + 5);
 document.querySelector("#count-input").addEventListener("change", event => setInputCount(event.target.value));
-document.querySelector("#record-form").addEventListener("submit", event => { event.preventDefault(); setInputCount(document.querySelector("#count-input").value); const before = todayTotal(); data.records.push({ id: crypto.randomUUID(), count: inputCount, memo: document.querySelector("#memo-input").value.trim(), createdAt: Date.now() }); saveData(); document.querySelector("#record-dialog").close(); document.querySelector("#memo-input").value = ""; render(); toast(before < data.goal && todayTotal() >= data.goal ? `✦ 目標クリア。${data.maidName}から一杯どうぞ。` : `${data.maidName}「${inputCount}回、いいね。」`); });
+document.querySelector("#record-form").addEventListener("submit", event => { event.preventDefault(); setInputCount(document.querySelector("#count-input").value); const before = todayTotal(); const createdAt = new Date(document.querySelector("#performed-at-input").value).getTime() || Date.now(); const memo = document.querySelector("#memo-input").value.trim(); const existing = data.records.find(record => record.id === editingRecordId); if (existing) { existing.count = inputCount; existing.memo = memo; existing.createdAt = createdAt; } else { data.records.push({ id: crypto.randomUUID(), count: inputCount, memo, createdAt }); } saveData(); document.querySelector("#record-dialog").close(); document.querySelector("#memo-input").value = ""; const wasEditing = editingRecordId !== null; editingRecordId = null; render(); if (!wasEditing) toast(before < data.goal && todayTotal() >= data.goal ? `✦ 目標クリア。${data.maidName}から一杯どうぞ。` : `${data.maidName}「${inputCount}回、いいね。」`); });
 document.querySelector("#goal-minus").onclick = () => { data.goal = Math.max(5, data.goal - 5); saveData(); render(); };
 document.querySelector("#goal-plus").onclick = () => { data.goal = Math.min(500, data.goal + 5); saveData(); render(); };
 document.querySelector("#goal-input").addEventListener("change", event => { data.goal = Math.min(500, Math.max(5, Number.parseInt(event.target.value, 10) || 5)); saveData(); render(); });
