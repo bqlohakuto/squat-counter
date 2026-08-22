@@ -74,9 +74,8 @@
         <label class="form-label" for="count-input">今回のスクワット</label>
         <div class="count-picker"><button type="button" id="count-minus" aria-label="回数を減らす">−</button><input id="count-input" type="number" inputmode="numeric" min="1" max="500" value="10" aria-label="スクワット回数" /><span>回</span><button type="button" id="count-plus" aria-label="回数を増やす">＋</button></div>
         <section class="motion-counter" aria-labelledby="motion-title">
-          <div><strong id="motion-title">傾きで数える</strong><p>iPhoneを胸元または前ポケットで固定し、まっすぐ立って開始してください。</p></div>
-          <div class="motion-controls"><strong id="motion-count">0</strong><span>回</span><button type="button" id="motion-start-button" class="motion-button">傾きで開始</button><button type="button" id="motion-stop-button" class="motion-button motion-stop" hidden>終了して入力</button></div>
-          <p id="motion-status" class="motion-status" role="status" aria-live="polite">開始するとセンサーへのアクセス許可を求めます。</p>
+          <div><strong id="motion-title">太ももで自動計測</strong><p>背面を太ももへ当て、スマホ上部を下にして使います。</p></div>
+          <button type="button" id="motion-open-button" class="motion-button">計測画面を開く</button>
         </section>
         <label class="form-label" for="performed-at-input">日時</label>
         <input id="performed-at-input" type="datetime-local" />
@@ -89,6 +88,18 @@
     <dialog id="staff-dialog" class="staff-dialog">
       <button id="close-staff-dialog" class="close-button" aria-label="閉じる">×</button>
       <img src="a_clean_cutout_transparent_background_illustration.png" alt="スタッフの全身イラスト" />
+    </dialog>
+    <dialog id="motion-dialog" class="motion-dialog">
+      <button id="motion-close-button" class="close-button" aria-label="計測を閉じる">×</button>
+      <p class="motion-dialog-kicker">THIGH SQUAT COUNTER</p>
+      <h2>太ももで計測</h2>
+      <div class="motion-live-count"><span>現在の回数</span><strong id="motion-count">0</strong><small>回</small></div>
+      <section id="motion-posture" class="motion-posture" data-phase="idle" aria-live="polite">
+        <span id="motion-posture-mark">Ⅰ</span><strong id="motion-posture-label">開始前</strong><p id="motion-status">スマホの背面を太ももへ。上部を下にして、直立した姿勢で準備してください。</p>
+      </section>
+      <div class="motion-guide"><span>直立</span><b>→</b><span>水平でOK</span><b>→</b><span>直立で+1</span></div>
+      <button id="motion-begin-button" class="primary-button" type="button">基準をセットして開始</button>
+      <button id="motion-finish-button" class="secondary-button" type="button" hidden>終了して記録へ</button>
     </dialog>
     <div id="toast" class="toast" role="status" aria-live="polite"></div>
     <script src="app.js"></script>

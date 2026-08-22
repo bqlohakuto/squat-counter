@@ -13,6 +13,7 @@ let data = loadData();
 let inputCount = 10;
 let editingRecordId = null;
 let motionState = null;
+let motionOriginRecord = null;
 
 function loadData() { try { return { goal: 30, maidName: "ルナ", records: [], ...JSON.parse(localStorage.getItem(STORAGE_KEY)) }; } catch { return { goal: 30, maidName: "ルナ", records: [] }; } }
 function saveData() { localStorage.setItem(STORAGE_KEY, JSON.stringify(data)); }
@@ -70,11 +71,11 @@ function toast(message) { const element = document.querySelector("#toast"); elem
 
 document.querySelectorAll(".tab").forEach(tab => tab.onclick = () => showPage(tab.dataset.page));
 function localDateTimeValue(timestamp) { const date = new Date(timestamp); const offset = date.getTimezoneOffset() * 60_000; return new Date(date - offset).toISOString().slice(0, 16); }
-function openRecordDialog(record = null) {
+function openRecordDialog(record = null, presetCount = null) {
   stopMotionCounter();
-  motionState = null; updateMotionUi(); setMotionStatus("開始するとセンサーへのアクセス許可を求めます。");
+  motionState = null;
   editingRecordId = record?.id ?? null;
-  setInputCount(record?.count ?? 10);
+  setInputCount(presetCount ?? record?.count ?? 10);
   document.querySelector("#memo-input").value = record?.memo ?? "";
   document.querySelector("#performed-at-input").value = localDateTimeValue(record?.createdAt ?? Date.now());
   document.querySelector("#record-dialog-title").textContent = record ? "記録を編集" : "記録する";
@@ -90,34 +91,47 @@ document.querySelector("#count-plus").onclick = () => setInputCount(inputCount +
 document.querySelector("#count-input").addEventListener("change", event => setInputCount(event.target.value));
 function setMotionStatus(message) { document.querySelector("#motion-status").textContent = message; }
 function updateMotionUi() {
-  const active = Boolean(motionState?.active);
-  document.querySelector("#motion-count").textContent = motionState?.count ?? 0;
-  document.querySelector("#motion-start-button").hidden = active;
-  document.querySelector("#motion-stop-button").hidden = !active;
+  const state = motionState ?? { count: 0, phase: "idle", active: false };
+  const labels = { idle: ["Ⅰ", "開始前"], calibrating: ["Ⅰ", "直立姿勢を確認中"], ready: ["Ⅱ", "しゃがんでください"], down: ["Ⅲ", "しゃがみ姿勢 OK"], done: ["✓", "計測を終了しました"] };
+  const [mark, label] = labels[state.phase] ?? labels.idle;
+  document.querySelector("#motion-count").textContent = state.count;
+  document.querySelector("#motion-posture").dataset.phase = state.phase;
+  document.querySelector("#motion-posture-mark").textContent = mark;
+  document.querySelector("#motion-posture-label").textContent = label;
+  document.querySelector("#motion-begin-button").hidden = state.active;
+  document.querySelector("#motion-finish-button").hidden = !state.active;
 }
+function haptic(pattern) { if (typeof navigator.vibrate === "function") navigator.vibrate(pattern); }
+function isUpright(beta) { return Math.abs(Math.abs(beta) - 90) <= 28; }
+function isHorizontal(beta) { return Math.abs(beta) <= 25; }
 function handleDeviceOrientation(event) {
   if (!motionState?.active || !Number.isFinite(event.beta) || !Number.isFinite(event.gamma)) return;
-  const reading = { beta: event.beta, gamma: event.gamma };
-  if (!motionState.baseline) {
-    motionState.samples.push(reading);
+  if (motionState.phase === "calibrating") {
+    if (!isUpright(event.beta)) { motionState.samples = []; setMotionStatus("スマホ上部を下にして、太ももをまっすぐにしてください。"); return; }
+    motionState.samples.push(event.beta);
     if (motionState.samples.length < 12) return;
-    const samples = motionState.samples;
-    motionState.baseline = { beta: samples.reduce((sum, item) => sum + item.beta, 0) / samples.length, gamma: samples.reduce((sum, item) => sum + item.gamma, 0) / samples.length };
-    setMotionStatus("準備完了。しゃがんでから、まっすぐ立つと1回です。");
+    motionState.phase = "ready"; setMotionStatus("準備完了。ゆっくりしゃがみ、スマホが水平になるまで下げてください。"); updateMotionUi();
     return;
   }
-  const tilt = Math.hypot(reading.beta - motionState.baseline.beta, reading.gamma - motionState.baseline.gamma);
-  if (!motionState.isDown && tilt >= 16) { motionState.isDown = true; setMotionStatus("立ち上がりを待っています。"); return; }
-  if (motionState.isDown && tilt <= 7 && Date.now() - motionState.lastCountAt >= 650) {
-    motionState.isDown = false; motionState.lastCountAt = Date.now(); motionState.count += 1;
+  if (motionState.phase === "ready" && isHorizontal(event.beta)) {
+    motionState.phase = "down"; haptic(80); setMotionStatus("しゃがみ姿勢を検出しました。立ち上がって直立姿勢へ戻ってください。"); updateMotionUi(); return;
+  }
+  if (motionState.phase === "down" && isUpright(event.beta) && Date.now() - motionState.lastCountAt >= 650) {
+    motionState.phase = "ready"; motionState.lastCountAt = Date.now(); motionState.count += 1;
     inputCount = motionState.count; document.querySelector("#count-input").value = inputCount;
-    updateMotionUi(); setMotionStatus(`${motionState.count}回。いいペースです。`);
+    haptic([45, 60, 45]); updateMotionUi(); setMotionStatus(`${motionState.count}回。もう一度しゃがんでください。`);
   }
 }
 function stopMotionCounter() {
   if (motionState?.active) window.removeEventListener("deviceorientation", handleDeviceOrientation);
   if (motionState) motionState.active = false;
-  updateMotionUi();
+}
+function openMotionCounter() {
+  motionOriginRecord = editingRecordId ? data.records.find(record => record.id === editingRecordId) : null;
+  document.querySelector("#record-dialog").close();
+  motionState = { active: false, phase: "idle", samples: [], count: 0, lastCountAt: 0 };
+  updateMotionUi(); setMotionStatus("スマホの背面を太ももへ。上部を下にして、直立した姿勢で準備してください。");
+  document.querySelector("#motion-dialog").showModal();
 }
 async function startMotionCounter() {
   if (!("DeviceOrientationEvent" in window)) return setMotionStatus("この端末では傾きセンサーを利用できません。手入力をご利用ください。");
@@ -126,15 +140,21 @@ async function startMotionCounter() {
       const permission = await DeviceOrientationEvent.requestPermission();
       if (permission !== "granted") return setMotionStatus("センサーの利用が許可されませんでした。Safariの設定をご確認ください。");
     }
-    motionState = { active: true, baseline: null, samples: [], count: 0, isDown: false, lastCountAt: 0 };
-    inputCount = 0; document.querySelector("#count-input").value = 0;
-    updateMotionUi(); setMotionStatus("まっすぐ立ったまま、姿勢を確認しています…");
+    motionState = { active: true, phase: "calibrating", samples: [], count: 0, lastCountAt: 0 };
+    updateMotionUi(); setMotionStatus("直立姿勢を確認しています。太ももを動かさずにお待ちください…");
     window.addEventListener("deviceorientation", handleDeviceOrientation);
   } catch { setMotionStatus("センサーを開始できませんでした。HTTPSのSafariからお試しください。"); }
 }
-document.querySelector("#motion-start-button").onclick = startMotionCounter;
-document.querySelector("#motion-stop-button").onclick = () => { stopMotionCounter(); setMotionStatus(motionState?.count ? `${motionState.count}回を入力欄へ反映しました。` : "回数が検出されませんでした。手入力で調整できます。"); };
-document.querySelector("#record-dialog").addEventListener("close", stopMotionCounter);
+function finishMotionCounter() {
+  const count = motionState?.count ?? 0;
+  stopMotionCounter(); document.querySelector("#motion-dialog").close();
+  if (count) openRecordDialog(motionOriginRecord, count);
+}
+document.querySelector("#motion-open-button").onclick = openMotionCounter;
+document.querySelector("#motion-begin-button").onclick = startMotionCounter;
+document.querySelector("#motion-finish-button").onclick = finishMotionCounter;
+document.querySelector("#motion-close-button").onclick = () => document.querySelector("#motion-dialog").close();
+document.querySelector("#motion-dialog").addEventListener("close", stopMotionCounter);
 document.querySelector("#record-form").addEventListener("submit", event => { event.preventDefault(); setInputCount(document.querySelector("#count-input").value); const before = todayTotal(); const createdAt = new Date(document.querySelector("#performed-at-input").value).getTime() || Date.now(); const memo = document.querySelector("#memo-input").value.trim(); const existing = data.records.find(record => record.id === editingRecordId); if (existing) { existing.count = inputCount; existing.memo = memo; existing.createdAt = createdAt; } else { data.records.push({ id: crypto.randomUUID(), count: inputCount, memo, createdAt }); } saveData(); document.querySelector("#record-dialog").close(); document.querySelector("#memo-input").value = ""; const wasEditing = editingRecordId !== null; editingRecordId = null; render(); if (!wasEditing) toast(before < data.goal && todayTotal() >= data.goal ? `✦ 目標クリア。${data.maidName}から一杯どうぞ。` : `${data.maidName}「${inputCount}回、いいね。」`); });
 document.querySelector("#goal-minus").onclick = () => { data.goal = Math.max(5, data.goal - 5); saveData(); render(); };
 document.querySelector("#goal-plus").onclick = () => { data.goal = Math.min(500, data.goal + 5); saveData(); render(); };
