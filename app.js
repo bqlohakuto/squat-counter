@@ -184,19 +184,22 @@ document.querySelector("#count-minus").onclick = () => setInputCount(inputCount 
 document.querySelector("#count-plus").onclick = () => setInputCount(inputCount + 5);
 document.querySelector("#count-input").addEventListener("change", event => setInputCount(event.target.value));
 function setMotionStatus(message) { document.querySelector("#motion-status").textContent = message; }
+function currentMotionSeconds(state = motionState) { return !state ? 0 : (state.elapsedSeconds ?? 0) + (state.activeSince ? (Date.now() - state.activeSince) / 1000 : 0); }
+function startMotionTimer() { if (motionTimer) window.clearInterval(motionTimer); motionTimer = window.setInterval(updateMotionUi, 500); }
 function updateMotionUi() {
   const state = motionState ?? { count: 0, phase: "idle", active: false };
-  const labels = { idle: ["Ⅰ", "開始前"], calibrating: ["Ⅰ", "直立姿勢を確認中"], ready: ["Ⅱ", "しゃがんでください"], down: ["Ⅲ", "しゃがみ姿勢 OK"], done: ["✓", "計測を終了しました"] };
+  const labels = { idle: ["Ⅰ", "開始前"], calibrating: ["Ⅰ", "直立姿勢を確認中"], ready: ["Ⅱ", "しゃがんでください"], down: ["Ⅲ", "しゃがみ姿勢 OK"], paused: ["Ⅱ", "計測を一時停止中"], done: ["✓", "計測を終了しました"] };
   const [mark, label] = labels[state.phase] ?? labels.idle;
   document.querySelector("#motion-count").textContent = state.count;
-  const elapsed = state.startedAt ? Math.floor((Date.now() - state.startedAt) / 1000) : state.durationSeconds ?? 0;
+  const elapsed = Math.floor(currentMotionSeconds(state));
   document.querySelector("#motion-duration").textContent = formatDuration(elapsed);
   document.querySelector("#motion-energy").innerHTML = `${activeEnergy(elapsed).toFixed(1)} <small>kcal</small>`;
   document.querySelector("#motion-posture").dataset.phase = state.phase;
   document.querySelector("#motion-posture-mark").textContent = mark;
   document.querySelector("#motion-posture-label").textContent = label;
-  document.querySelector("#motion-begin-button").hidden = state.active;
-  document.querySelector("#motion-finish-button").hidden = !state.active;
+  document.querySelector("#motion-begin-button").hidden = Boolean(state.started);
+  document.querySelector("#motion-begin-button").disabled = Boolean(state.started);
+  document.querySelector("#motion-finish-button").hidden = !state.started;
 }
 function haptic(pattern) { if (typeof navigator.vibrate === "function") navigator.vibrate(pattern); }
 function isUpright(beta) { return Math.abs(Math.abs(beta) - 90) <= 28; }
@@ -224,29 +227,47 @@ function stopMotionCounter() {
   if (motionTimer) { window.clearInterval(motionTimer); motionTimer = null; }
   if (motionState) motionState.active = false;
 }
+function pauseMotionCounter() {
+  if (!motionState?.active) return;
+  motionState.elapsedSeconds = currentMotionSeconds(); motionState.activeSince = null; motionState.phaseBeforePause = motionState.phase;
+  stopMotionCounter(); motionState.phase = "paused"; updateMotionUi();
+}
+function resumeMotionCounter() {
+  if (!motionState?.started || motionState.phase !== "paused") return;
+  motionState.active = true; motionState.activeSince = Date.now(); motionState.phase = motionState.phaseBeforePause ?? "ready";
+  window.addEventListener("deviceorientation", handleDeviceOrientation); startMotionTimer(); updateMotionUi();
+  setMotionStatus(motionState.phase === "calibrating" ? "直立姿勢を確認しています。太ももを動かさずにお待ちください…" : "計測を再開しました。しゃがんでください。");
+  document.querySelector("#motion-resume-dialog").close();
+}
+function interruptMotionCounter() {
+  stopMotionCounter(); motionState = null;
+  if (document.querySelector("#motion-resume-dialog").open) document.querySelector("#motion-resume-dialog").close();
+  if (document.querySelector("#motion-dialog").open) document.querySelector("#motion-dialog").close();
+}
 function openMotionCounter() {
   motionOriginRecord = editingRecordId ? data.records.find(record => record.id === editingRecordId) : null;
   document.querySelector("#record-dialog").close();
-  motionState = { active: false, phase: "idle", samples: [], count: 0, lastCountAt: 0, durationSeconds: 0 };
+  motionState = { active: false, started: false, phase: "idle", samples: [], count: 0, lastCountAt: 0, elapsedSeconds: 0 };
   updateMotionUi(); setMotionStatus("スマホの背面を太ももへ。上部を下にして、直立した姿勢で準備してください。");
   document.querySelector("#motion-dialog").showModal();
 }
 async function startMotionCounter() {
+  if (motionState?.started) return;
   if (!("DeviceOrientationEvent" in window)) return setMotionStatus("この端末では傾きセンサーを利用できません。手入力をご利用ください。");
   try {
     if (typeof DeviceOrientationEvent.requestPermission === "function") {
       const permission = await DeviceOrientationEvent.requestPermission();
       if (permission !== "granted") return setMotionStatus("センサーの利用が許可されませんでした。Safariの設定をご確認ください。");
     }
-    motionState = { active: true, phase: "calibrating", samples: [], count: 0, lastCountAt: 0, startedAt: Date.now() };
+    motionState = { active: true, started: true, phase: "calibrating", samples: [], count: 0, lastCountAt: 0, elapsedSeconds: 0, activeSince: Date.now() };
     updateMotionUi(); setMotionStatus("直立姿勢を確認しています。太ももを動かさずにお待ちください…");
     window.addEventListener("deviceorientation", handleDeviceOrientation);
-    motionTimer = window.setInterval(updateMotionUi, 500);
+    startMotionTimer();
   } catch { setMotionStatus("センサーを開始できませんでした。HTTPSのSafariからお試しください。"); }
 }
 function finishMotionCounter() {
   const count = motionState?.count ?? 0;
-  const durationSeconds = Math.max(1, Math.floor((Date.now() - (motionState?.startedAt ?? Date.now())) / 1000));
+  const durationSeconds = Math.max(1, Math.floor(currentMotionSeconds()));
   const result = { durationSeconds, activeEnergy: activeEnergy(durationSeconds) };
   stopMotionCounter(); document.querySelector("#motion-dialog").close();
   if (count) openRecordDialog(motionOriginRecord, count, result);
@@ -254,8 +275,15 @@ function finishMotionCounter() {
 document.querySelector("#motion-open-button").onclick = openMotionCounter;
 document.querySelector("#motion-begin-button").onclick = startMotionCounter;
 document.querySelector("#motion-finish-button").onclick = finishMotionCounter;
-document.querySelector("#motion-close-button").onclick = () => document.querySelector("#motion-dialog").close();
+document.querySelector("#motion-close-button").onclick = interruptMotionCounter;
 document.querySelector("#motion-dialog").addEventListener("close", stopMotionCounter);
+document.querySelector("#resume-motion-button").onclick = resumeMotionCounter;
+document.querySelector("#interrupt-motion-button").onclick = interruptMotionCounter;
+document.querySelector("#motion-resume-dialog").addEventListener("cancel", event => event.preventDefault());
+document.addEventListener("visibilitychange", () => {
+  if (document.hidden) pauseMotionCounter();
+  else if (motionState?.started && motionState.phase === "paused" && document.querySelector("#motion-dialog").open && !document.querySelector("#motion-resume-dialog").open) document.querySelector("#motion-resume-dialog").showModal();
+});
 document.querySelector("#record-form").addEventListener("submit", event => { event.preventDefault(); const unlockedBefore = unlockedStaffIds(); setInputCount(document.querySelector("#count-input").value); const before = todayTotal(); const createdAt = new Date(document.querySelector("#performed-at-input").value).getTime() || Date.now(); const memo = document.querySelector("#memo-input").value.trim(); const existing = data.records.find(record => record.id === editingRecordId); if (existing) { existing.count = inputCount; existing.memo = memo; existing.createdAt = createdAt; if (pendingMotionResult) Object.assign(existing, pendingMotionResult); } else { data.records.push({ id: crypto.randomUUID(), count: inputCount, memo, createdAt, ...(pendingMotionResult ?? {}) }); } const newlyUnlocked = [...unlockedStaffIds()].filter(id => !unlockedBefore.has(id)); saveData(); document.querySelector("#record-dialog").close(); document.querySelector("#memo-input").value = ""; const wasEditing = editingRecordId !== null; editingRecordId = null; pendingMotionResult = null; render(); const activeStaff = selectedStaff(); if (!wasEditing) toast(before < data.goal && todayTotal() >= data.goal ? `✦ ${staffName(activeStaff)}「${dialogueFor(activeStaff, data.goal, data.goal)}」` : `${staffName(activeStaff)}「${recordReactionFor(activeStaff, inputCount)}」`); showUnlockDialog(newlyUnlocked); });
 document.querySelector("#goal-minus").onclick = () => { data.goal = Math.max(5, data.goal - 5); saveData(); render(); };
 document.querySelector("#goal-plus").onclick = () => { data.goal = Math.min(500, data.goal + 5); saveData(); render(); };

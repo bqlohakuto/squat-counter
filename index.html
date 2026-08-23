@@ -112,6 +112,12 @@
       <button id="motion-begin-button" class="primary-button" type="button">基準をセットして開始</button>
       <button id="motion-finish-button" class="secondary-button" type="button" hidden>終了して記録へ</button>
     </dialog>
+    <dialog id="motion-resume-dialog" class="motion-resume-dialog">
+      <p class="motion-dialog-kicker">MEASUREMENT PAUSED</p><h2>計測を再開しますか？</h2>
+      <p>ページを離れたため、計測を一時停止しました。中断中の時間は計測時間に含まれません。</p>
+      <button id="resume-motion-button" class="primary-button" type="button">再開する</button>
+      <button id="interrupt-motion-button" class="secondary-button" type="button">中断する</button>
+    </dialog>
     <div id="toast" class="toast" role="status" aria-live="polite"></div>
     <script src="app.js"></script>
   </body>
