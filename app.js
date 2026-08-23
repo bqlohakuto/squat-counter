@@ -1,5 +1,6 @@
 const STORAGE_KEY = "squat-maid-data-v1";
 const SQUAT_MET = 5;
+const BACKUP_VERSION = 1;
 const MAIDS = [
   { id: "luna", name: "ルナ", role: "カウンター担当", threshold: 0, image: "a_clean_cutout_transparent_background_illustration.png" },
   { id: "mirei", name: "ミレイ", role: "もうひとりのスタッフ", threshold: 1000, image: "staff-2.png" },
@@ -20,6 +21,26 @@ let pendingMotionResult = null;
 
 function loadData() { try { return { goal: 30, maidName: "ルナ", selectedStaffId: "luna", weightKg: 60, records: [], ...JSON.parse(localStorage.getItem(STORAGE_KEY)) }; } catch { return { goal: 30, maidName: "ルナ", selectedStaffId: "luna", weightKg: 60, records: [] }; } }
 function saveData() { localStorage.setItem(STORAGE_KEY, JSON.stringify(data)); }
+function backupFileName() { return `squat-bar-backup-${new Date().toISOString().slice(0, 10)}.json`; }
+function backupPayload() { return { version: BACKUP_VERSION, exportedAt: new Date().toISOString(), app: "SQUAT BAR", data }; }
+function normalizeImportedData(candidate) {
+  if (!candidate || typeof candidate !== "object" || !Array.isArray(candidate.records)) throw new Error("invalid backup");
+  const selectedStaffId = MAIDS.some(staff => staff.id === candidate.selectedStaffId) ? candidate.selectedStaffId : "luna";
+  return {
+    goal: Math.min(500, Math.max(5, Number.parseInt(candidate.goal, 10) || 30)),
+    maidName: String(candidate.maidName || "ルナ").trim().slice(0, 20) || "ルナ",
+    selectedStaffId,
+    weightKg: Math.min(300, Math.max(20, Number.parseFloat(candidate.weightKg) || 60)),
+    records: candidate.records.map(record => ({
+      id: String(record.id || crypto.randomUUID()),
+      count: Math.min(500, Math.max(1, Number.parseInt(record.count, 10) || 1)),
+      memo: String(record.memo || "").slice(0, 80),
+      createdAt: Number.isFinite(Number(record.createdAt)) ? Number(record.createdAt) : Date.now(),
+      ...(Number.isFinite(Number(record.durationSeconds)) ? { durationSeconds: Math.max(0, Number(record.durationSeconds)) } : {}),
+      ...(Number.isFinite(Number(record.activeEnergy)) ? { activeEnergy: Math.max(0, Number(record.activeEnergy)) } : {})
+    }))
+  };
+}
 function dayKey(value) { const d = new Date(value); return `${d.getFullYear()}-${d.getMonth()}-${d.getDate()}`; }
 function todayKey() { return dayKey(Date.now()); }
 function total() { return data.records.reduce((sum, record) => sum + record.count, 0); }
@@ -211,6 +232,23 @@ document.querySelector("#goal-minus").onclick = () => { data.goal = Math.max(5, 
 document.querySelector("#goal-plus").onclick = () => { data.goal = Math.min(500, data.goal + 5); saveData(); render(); };
 document.querySelector("#goal-input").addEventListener("change", event => { data.goal = Math.min(500, Math.max(5, Number.parseInt(event.target.value, 10) || 5)); saveData(); render(); });
 document.querySelector("#weight-input").addEventListener("change", event => { data.weightKg = Math.min(300, Math.max(20, Number.parseFloat(event.target.value) || 20)); saveData(); render(); });
+document.querySelector("#export-data-button").onclick = async () => {
+  const file = new File([JSON.stringify(backupPayload(), null, 2)], backupFileName(), { type: "application/json" });
+  try {
+    if (navigator.canShare?.({ files: [file] })) { await navigator.share({ files: [file], title: "SQUAT BARのバックアップ" }); toast("共有先を選んでバックアップを保存してください。"); return; }
+    const link = document.createElement("a"); link.href = URL.createObjectURL(file); link.download = file.name; link.click(); URL.revokeObjectURL(link.href); toast("バックアップを保存しました。");
+  } catch (error) { if (error.name !== "AbortError") toast("バックアップを書き出せませんでした。"); }
+};
+document.querySelector("#import-data-input").addEventListener("change", async event => {
+  const file = event.target.files?.[0]; event.target.value = "";
+  if (!file) return;
+  try {
+    const payload = JSON.parse(await file.text());
+    const restored = normalizeImportedData(payload.data ?? payload);
+    if (!window.confirm("現在のデータをバックアップの内容で置き換えます。よろしいですか？")) return;
+    data = restored; saveData(); render(); toast("バックアップを読み込みました。");
+  } catch { toast("読み込めないバックアップファイルです。"); }
+});
 document.querySelector("#maid-name-input").addEventListener("change", event => { data.maidName = event.target.value.trim().slice(0, 20) || "ルナ"; saveData(); render(); });
 document.querySelector("#add-reminder-button").onclick = async () => { const reminder = { title: "SQUAT BAR", text: "スクワットを記録する", url: location.href }; if (!navigator.share) return toast("iPhoneのSafariから開くとリマインダーへ追加できます。"); try { await navigator.share(reminder); } catch (error) { if (error.name !== "AbortError") toast("共有メニューを開けませんでした。"); } };
 document.querySelector("#show-fullbody-button").onclick = () => document.querySelector("#staff-dialog").showModal();
