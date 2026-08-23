@@ -19,7 +19,7 @@ let motionOriginRecord = null;
 let motionTimer = null;
 let pendingMotionResult = null;
 
-function loadData() { try { return { goal: 30, maidName: "ルナ", selectedStaffId: "luna", weightKg: 60, records: [], ...JSON.parse(localStorage.getItem(STORAGE_KEY)) }; } catch { return { goal: 30, maidName: "ルナ", selectedStaffId: "luna", weightKg: 60, records: [] }; } }
+function loadData() { try { return { goal: 30, maidName: "ルナ", staffNames: {}, selectedStaffId: "luna", weightKg: 60, records: [], ...JSON.parse(localStorage.getItem(STORAGE_KEY)) }; } catch { return { goal: 30, maidName: "ルナ", staffNames: {}, selectedStaffId: "luna", weightKg: 60, records: [] }; } }
 function saveData() { localStorage.setItem(STORAGE_KEY, JSON.stringify(data)); }
 function backupFileName() { return `squat-bar-backup-${new Date().toISOString().slice(0, 10)}.json`; }
 function backupPayload() { return { version: BACKUP_VERSION, exportedAt: new Date().toISOString(), app: "SQUAT BAR", data }; }
@@ -29,6 +29,7 @@ function normalizeImportedData(candidate) {
   return {
     goal: Math.min(500, Math.max(5, Number.parseInt(candidate.goal, 10) || 30)),
     maidName: String(candidate.maidName || "ルナ").trim().slice(0, 20) || "ルナ",
+    staffNames: Object.fromEntries(MAIDS.map(staff => [staff.id, String(candidate.staffNames?.[staff.id] || "").trim().slice(0, 20)]).filter(([, name]) => name)),
     selectedStaffId,
     weightKg: Math.min(300, Math.max(20, Number.parseFloat(candidate.weightKg) || 60)),
     records: candidate.records.map(record => ({
@@ -58,7 +59,7 @@ function highAchievementStreak() {
 }
 function isStaffUnlocked(staff, all = total()) { return staff.unlock === "high-streak" ? highAchievementStreak() >= 7 : all >= staff.threshold; }
 function staffUnlockLabel(staff) { return staff.unlock === "high-streak" ? `1日100回以上を7日連続で達成（現在 ${Math.min(highAchievementStreak(), 7)} / 7日）` : `累計${staff.threshold}回で解放`; }
-function staffName(staff) { return staff.id === "luna" ? data.maidName : staff.name; }
+function staffName(staff) { return data.staffNames?.[staff.id] || (staff.id === "luna" ? data.maidName : staff.name); }
 function selectedStaff() { return MAIDS.find(staff => staff.id === data.selectedStaffId) ?? MAIDS[0]; }
 function streak() {
   const days = new Set(data.records.map(record => dayKey(record.createdAt)));
@@ -84,11 +85,10 @@ function render() {
   document.querySelector("#weight-input").value = data.weightKg;
   document.querySelector("#home-staff-image").src = activeStaff.image;
   document.querySelector("#home-staff-image").alt = `${staffName(activeStaff)}がバーカウンターに立つ`;
-  document.querySelector("#maid-name").textContent = `スタッフ：${staffName(activeStaff)}`;
-  document.querySelector("#maid-name-input").value = data.maidName;
+  document.querySelector("#maid-name").textContent = staffName(activeStaff);
   document.querySelector("#staff-dialog-image").src = activeStaff.image;
   document.querySelector("#staff-dialog-image").alt = `${staffName(activeStaff)}の全身イラスト`;
-  renderHistory(); renderCollection(all);
+  renderHistory(); renderCollection(all); renderStaffNameSettings();
 }
 function renderHistory() {
   const list = document.querySelector("#history-list"), empty = document.querySelector("#history-empty");
@@ -119,6 +119,16 @@ function renderCollection(all) {
     list.append(card);
   });
   renderUnlocks("#reward-list", REWARDS, all);
+}
+function renderStaffNameSettings() {
+  const root = document.querySelector("#staff-name-settings"); root.innerHTML = "";
+  MAIDS.forEach(staff => {
+    const row = document.createElement("label"); row.className = "staff-name-row";
+    const name = document.createElement("span"); name.textContent = staff.role;
+    const input = document.createElement("input"); input.type = "text"; input.maxLength = 20; input.value = staffName(staff); input.setAttribute("aria-label", `${staffName(staff)}の名前`);
+    input.onchange = event => { const nextName = event.target.value.trim().slice(0, 20) || staff.name; data.staffNames ??= {}; data.staffNames[staff.id] = nextName; if (staff.id === "luna") data.maidName = nextName; saveData(); render(); };
+    row.append(name, input); root.append(row);
+  });
 }
 function renderUnlocks(selector, items, all, usesMaidName = false) {
   const root = document.querySelector(selector); root.innerHTML = "";
@@ -249,7 +259,6 @@ document.querySelector("#import-data-input").addEventListener("change", async ev
     data = restored; saveData(); render(); toast("バックアップを読み込みました。");
   } catch { toast("読み込めないバックアップファイルです。"); }
 });
-document.querySelector("#maid-name-input").addEventListener("change", event => { data.maidName = event.target.value.trim().slice(0, 20) || "ルナ"; saveData(); render(); });
 document.querySelector("#add-reminder-button").onclick = async () => { const reminder = { title: "SQUAT BAR", text: "スクワットを記録する", url: location.href }; if (!navigator.share) return toast("iPhoneのSafariから開くとリマインダーへ追加できます。"); try { await navigator.share(reminder); } catch (error) { if (error.name !== "AbortError") toast("共有メニューを開けませんでした。"); } };
 document.querySelector("#show-fullbody-button").onclick = () => document.querySelector("#staff-dialog").showModal();
 document.querySelector("#close-staff-dialog").onclick = () => document.querySelector("#staff-dialog").close();

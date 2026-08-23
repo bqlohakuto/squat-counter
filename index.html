@@ -27,7 +27,7 @@
           <div class="counter-edge" aria-hidden="true"></div>
           <div class="bar-stools" aria-hidden="true"><span></span><span></span><span></span></div>
         </article>
-        <article class="conversation-window"><p id="maid-name" class="maid-name">スタッフ：ルナ</p><p id="encouragement" class="maid-message"></p><span id="achievement-badge" class="achievement-badge" hidden>✦ 目標クリア</span></article>
+        <article class="conversation-window"><p id="maid-name" class="maid-name">ルナ</p><p id="encouragement" class="maid-message"></p><span id="achievement-badge" class="achievement-badge" hidden>✦ 目標クリア</span></article>
 
         <article class="progress-card">
           <div class="progress-label"><span>今日のスクワット</span><div class="progress-actions"><button id="add-record-button" class="progress-action pencil-action" aria-label="スクワットを記録">✎</button><button id="share-button" class="progress-action x-action" aria-label="今日の記録をXへ投稿">𝕏</button><strong id="today-count">0 / 30 回</strong></div></div>
@@ -58,7 +58,7 @@
       </section>
 
       <section id="settings-page" class="page" aria-label="設定">
-        <article class="settings-card"><label for="maid-name-input">ルナの名前</label><input id="maid-name-input" class="settings-input" maxlength="20" value="ルナ" placeholder="例：ルナ" /><p class="input-hint">応援メッセージやスタッフ一覧に反映されます。</p></article>
+        <article class="settings-card"><strong>スタッフの名前</strong><div id="staff-name-settings" class="staff-name-settings"></div><p class="input-hint">会話欄やスタッフ一覧に反映されます。</p></article>
         <article class="settings-card"><label for="goal-input">1日の目標回数</label><div class="goal-control"><button id="goal-minus" aria-label="目標を減らす">−</button><input id="goal-input" type="number" inputmode="numeric" min="5" max="500" step="5" value="30" aria-label="1日の目標回数" /><span>回</span><button id="goal-plus" aria-label="目標を増やす">＋</button></div></article>
         <article class="settings-card"><label for="weight-input">体重</label><div class="weight-control"><input id="weight-input" type="number" inputmode="decimal" min="20" max="300" step="0.1" value="60" aria-label="体重" /><span>kg</span></div><p class="input-hint">太もも計測時のアクティブエネルギー概算に使います。</p></article>
         <article class="settings-card"><strong>データのバックアップ</strong><p class="input-hint">スクワット履歴・設定・解放スタッフをJSONファイルに保存、または復元できます。</p><div class="backup-actions"><button id="export-data-button" class="secondary-button" type="button">データを書き出す</button><label class="secondary-button import-data-button">データを読み込む<input id="import-data-input" type="file" accept="application/json,.json" hidden /></label></div></article>
