@@ -61,6 +61,23 @@ function isStaffUnlocked(staff, all = total()) { return staff.unlock === "high-s
 function staffUnlockLabel(staff) { return staff.unlock === "high-streak" ? `1日100回以上を7日連続で達成（現在 ${Math.min(highAchievementStreak(), 7)} / 7日）` : `累計${staff.threshold}回で解放`; }
 function staffName(staff) { return data.staffNames?.[staff.id] || (staff.id === "luna" ? data.maidName : staff.name); }
 function selectedStaff() { return MAIDS.find(staff => staff.id === data.selectedStaffId) ?? MAIDS[0]; }
+function dialogueFor(staff, current, goal) {
+  const lines = {
+    luna: current >= goal ? "目標クリア。おつかれさま、今日はゆっくりして。" : current === 0 ? "焦らなくていい。できる分から始めよう。" : current < goal / 2 ? "その調子。呼吸を忘れずに。" : "半分まできたね。無理はしないで。",
+    mirei: current >= goal ? "目標達成！ 最高だよ、この勢いでいこう！" : current === 0 ? "準備はいい？ まず一回、いこう！" : current < goal / 2 ? "いいぞ！ まだまだいける！" : "折り返し！ ここからが勝負だよ！",
+    manager: current >= goal ? "目標達成ですね。よくできました。次も丁寧に続けましょう。" : current === 0 ? "姿勢を整えてから始めましょう。回数より質です。" : current < goal / 2 ? "丁寧に。反動に頼らないように。" : "残りも同じフォームで。崩さないこと。"
+  };
+  return lines[staff.id] ?? lines.luna;
+}
+function recordReactionFor(staff, count) {
+  const level = count >= 100 ? "high" : count >= 30 ? "medium" : "low";
+  const lines = {
+    luna: { low: "いいね。少しずつで十分。", medium: "しっかり積み上げたね。えらい。", high: "100回以上……すごいよ。ちゃんと休んで。" },
+    mirei: { low: "いいスタート！ 次もいこう！", medium: "その回数、燃えてきた！", high: "100回超え！ 本気、見せてもらったよ！" },
+    manager: { low: "記録できました。継続が大切です。", medium: "よくできました。フォームも確認しましょう。", high: "見事です。ただし無理は禁物ですよ。" }
+  };
+  return lines[staff.id]?.[level] ?? lines.luna[level];
+}
 function streak() {
   const days = new Set(data.records.map(record => dayKey(record.createdAt)));
   let date = new Date(); date.setHours(0,0,0,0);
@@ -78,7 +95,7 @@ function render() {
   document.querySelector("#streak-count").textContent = streak();
   document.querySelector("#progress-bar").style.width = `${Math.min(100, current / data.goal * 100)}%`;
   document.querySelector("#mission-text").textContent = `スクワットを${data.goal}回行う（${Math.min(current, data.goal)} / ${data.goal}）`;
-  document.querySelector("#encouragement").textContent = achieved ? "目標クリア。いい夜にしよう。" : current ? `いいペース。あと${data.goal - current}回で今日の目標だよ。` : "おつかれさま。今日はどれくらいやる？";
+  document.querySelector("#encouragement").textContent = dialogueFor(activeStaff, current, data.goal);
   document.querySelector("#achievement-badge").hidden = !achieved;
   document.querySelector("#collection-total").textContent = all;
   document.querySelector("#goal-input").value = data.goal;
@@ -88,7 +105,7 @@ function render() {
   document.querySelector("#maid-name").textContent = staffName(activeStaff);
   document.querySelector("#staff-dialog-image").src = activeStaff.image;
   document.querySelector("#staff-dialog-image").alt = `${staffName(activeStaff)}の全身イラスト`;
-  renderHistory(); renderCollection(all); renderStaffNameSettings();
+  renderHistory(); renderCollection(all);
 }
 function renderHistory() {
   const list = document.querySelector("#history-list"), empty = document.querySelector("#history-empty");
@@ -112,23 +129,25 @@ function renderCollection(all) {
   const list = document.querySelector("#staff-list"); list.innerHTML = "";
   MAIDS.forEach(staff => {
     const unlocked = isStaffUnlocked(staff, all), selected = staff.id === data.selectedStaffId;
-    const card = document.createElement("button"); card.type = "button"; card.className = `staff-select-card ${selected ? "selected" : ""} ${unlocked ? "" : "locked"}`;
-    card.disabled = !unlocked;
-    card.innerHTML = unlocked ? `<img src="${staff.image}" alt="${staffName(staff)}" /><span><strong>${staffName(staff)}</strong><small>${staff.role}</small></span><b>${selected ? "選択中" : "選択"}</b>` : `<span class="staff-lock-avatar">🔒</span><span><strong>？？？</strong><small>${staffUnlockLabel(staff)}</small></span><b>🔒</b>`;
-    if (unlocked) card.onclick = () => { data.selectedStaffId = staff.id; saveData(); render(); };
+    const card = document.createElement("article"); card.className = `staff-select-card ${selected ? "selected" : ""} ${unlocked ? "" : "locked"}`;
+    if (unlocked) {
+      const select = document.createElement("button"); select.type = "button"; select.className = "staff-select-main";
+      select.innerHTML = `<img src="${staff.image}" alt="${staffName(staff)}" /><span><strong>${staffName(staff)}</strong><small>${staff.role}</small></span><b>${selected ? "選択中" : "選択"}</b>`;
+      select.onclick = () => { data.selectedStaffId = staff.id; saveData(); render(); };
+      const nameRow = document.createElement("label"); nameRow.className = "staff-card-name-row"; nameRow.innerHTML = "<span>表示名</span>";
+      const input = document.createElement("input"); input.type = "text"; input.maxLength = 20; input.value = staffName(staff); input.setAttribute("aria-label", `${staffName(staff)}の表示名`);
+      input.onchange = event => { const nextName = event.target.value.trim().slice(0, 20) || staff.name; data.staffNames ??= {}; data.staffNames[staff.id] = nextName; if (staff.id === "luna") data.maidName = nextName; saveData(); render(); };
+      nameRow.append(input); card.append(select, nameRow);
+    } else card.innerHTML = `<div class="staff-select-main"><span class="staff-lock-avatar">🔒</span><span><strong>？？？</strong><small>${staffUnlockLabel(staff)}</small></span><b>🔒</b></div>`;
     list.append(card);
   });
   renderUnlocks("#reward-list", REWARDS, all);
 }
-function renderStaffNameSettings() {
-  const root = document.querySelector("#staff-name-settings"); root.innerHTML = "";
-  MAIDS.forEach(staff => {
-    const row = document.createElement("label"); row.className = "staff-name-row";
-    const name = document.createElement("span"); name.textContent = staff.role;
-    const input = document.createElement("input"); input.type = "text"; input.maxLength = 20; input.value = staffName(staff); input.setAttribute("aria-label", `${staffName(staff)}の名前`);
-    input.onchange = event => { const nextName = event.target.value.trim().slice(0, 20) || staff.name; data.staffNames ??= {}; data.staffNames[staff.id] = nextName; if (staff.id === "luna") data.maidName = nextName; saveData(); render(); };
-    row.append(name, input); root.append(row);
-  });
+function unlockedStaffIds() { const all = total(); return new Set(MAIDS.filter(staff => isStaffUnlocked(staff, all)).map(staff => staff.id)); }
+function showUnlockDialog(ids) {
+  const staff = MAIDS.filter(item => ids.includes(item.id)); if (!staff.length) return;
+  const list = document.querySelector("#unlock-dialog-list"); list.innerHTML = staff.map(item => `<article><img src="${item.image}" alt="${escapeHtml(staffName(item))}" /><div><strong>${escapeHtml(staffName(item))}</strong><span>${item.role}</span></div></article>`).join("");
+  document.querySelector("#unlock-dialog").showModal();
 }
 function renderUnlocks(selector, items, all, usesMaidName = false) {
   const root = document.querySelector(selector); root.innerHTML = "";
@@ -237,7 +256,7 @@ document.querySelector("#motion-begin-button").onclick = startMotionCounter;
 document.querySelector("#motion-finish-button").onclick = finishMotionCounter;
 document.querySelector("#motion-close-button").onclick = () => document.querySelector("#motion-dialog").close();
 document.querySelector("#motion-dialog").addEventListener("close", stopMotionCounter);
-document.querySelector("#record-form").addEventListener("submit", event => { event.preventDefault(); setInputCount(document.querySelector("#count-input").value); const before = todayTotal(); const createdAt = new Date(document.querySelector("#performed-at-input").value).getTime() || Date.now(); const memo = document.querySelector("#memo-input").value.trim(); const existing = data.records.find(record => record.id === editingRecordId); if (existing) { existing.count = inputCount; existing.memo = memo; existing.createdAt = createdAt; if (pendingMotionResult) Object.assign(existing, pendingMotionResult); } else { data.records.push({ id: crypto.randomUUID(), count: inputCount, memo, createdAt, ...(pendingMotionResult ?? {}) }); } saveData(); document.querySelector("#record-dialog").close(); document.querySelector("#memo-input").value = ""; const wasEditing = editingRecordId !== null; editingRecordId = null; pendingMotionResult = null; render(); const activeName = staffName(selectedStaff()); if (!wasEditing) toast(before < data.goal && todayTotal() >= data.goal ? `✦ 目標クリア。${activeName}から一杯どうぞ。` : `${activeName}「${inputCount}回、いいね。」`); });
+document.querySelector("#record-form").addEventListener("submit", event => { event.preventDefault(); const unlockedBefore = unlockedStaffIds(); setInputCount(document.querySelector("#count-input").value); const before = todayTotal(); const createdAt = new Date(document.querySelector("#performed-at-input").value).getTime() || Date.now(); const memo = document.querySelector("#memo-input").value.trim(); const existing = data.records.find(record => record.id === editingRecordId); if (existing) { existing.count = inputCount; existing.memo = memo; existing.createdAt = createdAt; if (pendingMotionResult) Object.assign(existing, pendingMotionResult); } else { data.records.push({ id: crypto.randomUUID(), count: inputCount, memo, createdAt, ...(pendingMotionResult ?? {}) }); } const newlyUnlocked = [...unlockedStaffIds()].filter(id => !unlockedBefore.has(id)); saveData(); document.querySelector("#record-dialog").close(); document.querySelector("#memo-input").value = ""; const wasEditing = editingRecordId !== null; editingRecordId = null; pendingMotionResult = null; render(); const activeStaff = selectedStaff(); if (!wasEditing) toast(before < data.goal && todayTotal() >= data.goal ? `✦ ${staffName(activeStaff)}「${dialogueFor(activeStaff, data.goal, data.goal)}」` : `${staffName(activeStaff)}「${recordReactionFor(activeStaff, inputCount)}」`); showUnlockDialog(newlyUnlocked); });
 document.querySelector("#goal-minus").onclick = () => { data.goal = Math.max(5, data.goal - 5); saveData(); render(); };
 document.querySelector("#goal-plus").onclick = () => { data.goal = Math.min(500, data.goal + 5); saveData(); render(); };
 document.querySelector("#goal-input").addEventListener("change", event => { data.goal = Math.min(500, Math.max(5, Number.parseInt(event.target.value, 10) || 5)); saveData(); render(); });
@@ -262,5 +281,7 @@ document.querySelector("#import-data-input").addEventListener("change", async ev
 document.querySelector("#add-reminder-button").onclick = async () => { const reminder = { title: "SQUAT BAR", text: "スクワットを記録する", url: location.href }; if (!navigator.share) return toast("iPhoneのSafariから開くとリマインダーへ追加できます。"); try { await navigator.share(reminder); } catch (error) { if (error.name !== "AbortError") toast("共有メニューを開けませんでした。"); } };
 document.querySelector("#show-fullbody-button").onclick = () => document.querySelector("#staff-dialog").showModal();
 document.querySelector("#close-staff-dialog").onclick = () => document.querySelector("#staff-dialog").close();
+document.querySelector("#close-unlock-dialog").onclick = () => document.querySelector("#unlock-dialog").close();
+document.querySelector("#unlock-dialog").addEventListener("cancel", event => event.preventDefault());
 if ("serviceWorker" in navigator) navigator.serviceWorker.register("service-worker.js");
 render();
