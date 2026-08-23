@@ -2,7 +2,8 @@ const STORAGE_KEY = "squat-maid-data-v1";
 const SQUAT_MET = 5;
 const MAIDS = [
   { id: "luna", name: "ルナ", role: "カウンター担当", threshold: 0, image: "a_clean_cutout_transparent_background_illustration.png" },
-  { id: "mirei", name: "ミレイ", role: "もうひとりのスタッフ", threshold: 1000, image: "staff-2.png" }
+  { id: "mirei", name: "ミレイ", role: "もうひとりのスタッフ", threshold: 1000, image: "staff-2.png" },
+  { id: "manager", name: "店長", role: "SQUAT BAR 店長", image: "staff-manager.png", unlock: "high-streak" }
 ];
 const REWARDS = [
   { name: "お祝いのリボン", role: "累計100回で解放", icon: "🎀", threshold: 100 },
@@ -26,7 +27,16 @@ function todayTotal() { return data.records.filter(record => dayKey(record.creat
 function activeEnergy(seconds, weightKg = data.weightKg) { return Math.max(0, (SQUAT_MET - 1) * 3.5 * weightKg / 200 * (seconds / 60)); }
 function formatEnergy(value) { return `${Number(value || 0).toFixed(1)} kcal`; }
 function formatDuration(seconds) { const safe = Math.max(0, Math.floor(seconds || 0)); return `${Math.floor(safe / 60)}:${String(safe % 60).padStart(2, "0")}`; }
-function isStaffUnlocked(staff, all = total()) { return all >= staff.threshold; }
+function highAchievementStreak() {
+  const dailyTotals = new Map();
+  data.records.forEach(record => dailyTotals.set(dayKey(record.createdAt), (dailyTotals.get(dayKey(record.createdAt)) ?? 0) + record.count));
+  let date = new Date(); date.setHours(0, 0, 0, 0);
+  if ((dailyTotals.get(dayKey(date)) ?? 0) < 100) date.setDate(date.getDate() - 1);
+  let count = 0; while ((dailyTotals.get(dayKey(date)) ?? 0) >= 100) { count += 1; date.setDate(date.getDate() - 1); }
+  return count;
+}
+function isStaffUnlocked(staff, all = total()) { return staff.unlock === "high-streak" ? highAchievementStreak() >= 7 : all >= staff.threshold; }
+function staffUnlockLabel(staff) { return staff.unlock === "high-streak" ? `1日100回以上を7日連続で達成（現在 ${Math.min(highAchievementStreak(), 7)} / 7日）` : `累計${staff.threshold}回で解放`; }
 function staffName(staff) { return staff.id === "luna" ? data.maidName : staff.name; }
 function selectedStaff() { return MAIDS.find(staff => staff.id === data.selectedStaffId) ?? MAIDS[0]; }
 function streak() {
@@ -83,7 +93,7 @@ function renderCollection(all) {
     const unlocked = isStaffUnlocked(staff, all), selected = staff.id === data.selectedStaffId;
     const card = document.createElement("button"); card.type = "button"; card.className = `staff-select-card ${selected ? "selected" : ""} ${unlocked ? "" : "locked"}`;
     card.disabled = !unlocked;
-    card.innerHTML = unlocked ? `<img src="${staff.image}" alt="${staffName(staff)}" /><span><strong>${staffName(staff)}</strong><small>${staff.role}</small></span><b>${selected ? "選択中" : "選択"}</b>` : `<span class="staff-lock-avatar">🔒</span><span><strong>？？？</strong><small>累計${staff.threshold}回で解放</small></span><b>🔒</b>`;
+    card.innerHTML = unlocked ? `<img src="${staff.image}" alt="${staffName(staff)}" /><span><strong>${staffName(staff)}</strong><small>${staff.role}</small></span><b>${selected ? "選択中" : "選択"}</b>` : `<span class="staff-lock-avatar">🔒</span><span><strong>？？？</strong><small>${staffUnlockLabel(staff)}</small></span><b>🔒</b>`;
     if (unlocked) card.onclick = () => { data.selectedStaffId = staff.id; saveData(); render(); };
     list.append(card);
   });
