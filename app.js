@@ -287,6 +287,16 @@ function interruptMotionCounter() {
   if (document.querySelector("#motion-resume-dialog").open) document.querySelector("#motion-resume-dialog").close();
   if (document.querySelector("#motion-dialog").open) document.querySelector("#motion-dialog").close();
 }
+function requestCloseMotionCounter() {
+  if (motionState?.started) {
+    const count = motionState.count ?? 0;
+    const message = count
+      ? `計測を中断しますか？\n今回の${count}回は記録されず、ペナルティ消化分も取り消せません。`
+      : "計測を中断しますか？";
+    if (!window.confirm(message)) return;
+  }
+  interruptMotionCounter();
+}
 function openMotionCounter() {
   motionOriginRecord = editingRecordId ? data.records.find(record => record.id === editingRecordId) : null;
   document.querySelector("#record-dialog").close();
@@ -319,7 +329,12 @@ function finishMotionCounter() {
 document.querySelector("#motion-open-button").onclick = openMotionCounter;
 document.querySelector("#motion-begin-button").onclick = startMotionCounter;
 document.querySelector("#motion-finish-button").onclick = finishMotionCounter;
-document.querySelector("#motion-close-button").onclick = interruptMotionCounter;
+document.querySelector("#motion-close-button").onclick = requestCloseMotionCounter;
+document.querySelector("#motion-dialog").addEventListener("cancel", event => {
+  if (!motionState?.started) return;
+  event.preventDefault();
+  requestCloseMotionCounter();
+});
 document.querySelector("#motion-dialog").addEventListener("close", stopMotionCounter);
 document.querySelector("#resume-motion-button").onclick = resumeMotionCounter;
 document.querySelector("#interrupt-motion-button").onclick = interruptMotionCounter;
@@ -327,6 +342,11 @@ document.querySelector("#motion-resume-dialog").addEventListener("cancel", event
 document.addEventListener("visibilitychange", () => {
   if (document.hidden) pauseMotionCounter();
   else if (motionState?.started && motionState.phase === "paused" && document.querySelector("#motion-dialog").open && !document.querySelector("#motion-resume-dialog").open) document.querySelector("#motion-resume-dialog").showModal();
+});
+window.addEventListener("beforeunload", event => {
+  if (!motionState?.started) return;
+  event.preventDefault();
+  event.returnValue = "";
 });
 document.querySelector("#record-form").addEventListener("submit", event => { event.preventDefault(); const unlockedBefore = unlockedStaffIds(); setInputCount(document.querySelector("#count-input").value); const before = todayTotal(); const createdAt = new Date(document.querySelector("#performed-at-input").value).getTime() || Date.now(); const memo = document.querySelector("#memo-input").value.trim(); const existing = data.records.find(record => record.id === editingRecordId); if (existing) { existing.count = inputCount; existing.memo = memo; existing.createdAt = createdAt; if (pendingMotionResult) Object.assign(existing, pendingMotionResult); } else { data.records.push({ id: crypto.randomUUID(), count: inputCount, memo, createdAt, ...(pendingMotionResult ?? {}) }); } const newlyUnlocked = [...unlockedStaffIds()].filter(id => !unlockedBefore.has(id)); saveData(); document.querySelector("#record-dialog").close(); document.querySelector("#memo-input").value = ""; const wasEditing = editingRecordId !== null; editingRecordId = null; pendingMotionResult = null; render(); const activeStaff = selectedStaff(); if (!wasEditing) toast(before < data.goal && todayTotal() >= data.goal ? `✦ ${staffName(activeStaff)}「${dialogueFor(activeStaff, data.goal, data.goal)}」` : `${staffName(activeStaff)}「${recordReactionFor(activeStaff, inputCount)}」`); showUnlockDialog(newlyUnlocked); });
 document.querySelector("#goal-minus").onclick = () => { data.goal = Math.max(5, data.goal - 5); saveData(); render(); };
