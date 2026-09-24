@@ -320,6 +320,7 @@ async function startMotionCounter() {
 }
 function finishMotionCounter() {
   const count = motionState?.count ?? 0;
+  if (!window.confirm(`計測を終了して記録画面へ進みますか？\n今回のスクワット：${count}回\nキャンセルすると計測を続けます。`)) return;
   const penaltyConsumed = motionState?.penaltyConsumed ?? 0;
   const durationSeconds = Math.max(1, Math.floor(currentMotionSeconds()));
   const result = { durationSeconds, activeEnergy: activeEnergy(durationSeconds) };
