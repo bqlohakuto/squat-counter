@@ -21,3 +21,16 @@
 ## ローカル確認
 
 Windowsでは `index.html` をブラウザで開くだけで画面を確認できます。オフライン動作を含むPWAの確認には、HTTPSまたはローカルWebサーバーが必要です。
+
+
+## Talk Coach連携
+
+Quick DeckのTalk CoachとFirebase Realtime Database経由で同期できます。
+
+- Talk Coachの60秒警告1回につきスクワット10回を追加
+- 太もも自動計測で1回成功するたびにペナルティを1回消化
+- 残り回数をiPhone / Quick Deck / OBSへリアルタイム反映
+- 計測終了後は従来どおり通常のスクワット記録として保存可能
+
+Quick Deck側でFirebase設定後、「スマホ用設定をコピー」を押し、
+SQUAT BARの「設定 → Talk Coach連携」へ貼り付けてください。
