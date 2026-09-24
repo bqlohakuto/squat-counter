@@ -34,6 +34,15 @@
           <div class="progress-track"><div id="progress-bar" class="progress-bar"></div></div>
         </article>
 
+        <article id="talk-coach-penalty-card" class="talk-coach-penalty-card" hidden>
+          <div class="talk-coach-penalty-head">
+            <div><span>TALK COACH</span><strong>スクワットペナルティ</strong></div>
+            <b id="penalty-sync-status">未接続</b>
+          </div>
+          <div class="talk-coach-penalty-count"><strong><span id="penalty-completed">0</span> / <span id="penalty-target">0</span></strong><small>残り <b id="penalty-remaining">0</b> 回</small></div>
+          <div class="talk-coach-penalty-track"><span id="penalty-progress"></span></div>
+        </article>
+
         <div class="stats-grid">
           <article class="stat-card"><strong id="streak-count">0</strong><span>連続達成日</span></article>
           <article class="stat-card"><strong id="total-count">0</strong><span>累計スクワット</span></article>
@@ -60,6 +69,16 @@
       <section id="settings-page" class="page" aria-label="設定">
         <article class="settings-card"><label for="goal-input">1日の目標回数</label><div class="goal-control"><button id="goal-minus" aria-label="目標を減らす">−</button><input id="goal-input" type="number" inputmode="numeric" min="5" max="500" step="5" value="30" aria-label="1日の目標回数" /><span>回</span><button id="goal-plus" aria-label="目標を増やす">＋</button></div></article>
         <article class="settings-card"><label for="weight-input">体重</label><div class="weight-control"><input id="weight-input" type="number" inputmode="decimal" min="20" max="300" step="0.1" value="60" aria-label="体重" /><span>kg</span></div><p class="input-hint">太もも計測時のアクティブエネルギー概算に使います。</p></article>
+        <article class="settings-card talk-coach-link-settings">
+          <strong>Talk Coach連携</strong>
+          <p class="input-hint">Quick Deckの「スマホ用設定をコピー」で取得した連携設定を貼り付けます。</p>
+          <textarea id="penalty-setup-input" rows="5" placeholder='{"version":1,"config":{...},"room":"..."}'></textarea>
+          <div class="backup-actions">
+            <button id="penalty-setup-save" class="secondary-button" type="button">連携設定を保存</button>
+            <button id="penalty-setup-clear" class="secondary-button" type="button">連携を解除</button>
+          </div>
+          <p id="penalty-setup-status" class="input-hint">未設定</p>
+        </article>
         <article class="settings-card"><strong>データのバックアップ</strong><p class="input-hint">スクワット履歴・設定・解放スタッフをJSONファイルに保存、または復元できます。</p><div class="backup-actions"><button id="export-data-button" class="secondary-button" type="button">データを書き出す</button><label class="secondary-button import-data-button">データを読み込む<input id="import-data-input" type="file" accept="application/json,.json" hidden /></label></div></article>
         <article class="settings-card"><strong>リマインダー</strong><p class="input-hint">共有メニューから「リマインダー」を選び、通知時刻を設定できます。</p><button id="add-reminder-button" class="secondary-button">iPhoneのリマインダーに追加</button></article>
         <article class="settings-card about"><strong>SQUAT BAR</strong><p>カウンター越しのひとことと、毎日の小さな積み重ねを。</p></article>
@@ -105,6 +124,11 @@
       <h2>太ももで計測</h2>
       <div class="motion-live-count"><span>現在の回数</span><strong id="motion-count">0</strong><small>回</small></div>
       <div class="motion-metrics"><article><span>計測時間</span><strong id="motion-duration">0:00</strong></article><article><span>アクティブエネルギー</span><strong id="motion-energy">0.0 <small>kcal</small></strong></article></div>
+      <section id="motion-penalty-live" class="motion-penalty-live" hidden>
+        <span>TALK COACH PENALTY</span>
+        <strong><b id="motion-penalty-completed">0</b> / <b id="motion-penalty-target">0</b></strong>
+        <small>残り <b id="motion-penalty-remaining">0</b> 回</small>
+      </section>
       <section id="motion-posture" class="motion-posture" data-phase="idle" aria-live="polite">
         <span id="motion-posture-mark">Ⅰ</span><strong id="motion-posture-label">開始前</strong><p id="motion-status">スマホの背面を太ももへ。上部を下にして、直立した姿勢で準備してください。</p>
       </section>
@@ -119,6 +143,10 @@
       <button id="interrupt-motion-button" class="secondary-button" type="button">中断する</button>
     </dialog>
     <div id="toast" class="toast" role="status" aria-live="polite"></div>
+    <script src="https://www.gstatic.com/firebasejs/12.19.0/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/12.19.0/firebase-auth-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/12.19.0/firebase-database-compat.js"></script>
+    <script src="penalty-sync.js"></script>
     <script src="app.js"></script>
   </body>
 </html>
