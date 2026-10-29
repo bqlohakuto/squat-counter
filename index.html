@@ -56,6 +56,14 @@
           <article class="history-summary-card"><span>最高記録</span><strong id="history-best-count">0回</strong><small id="history-best-energy">0.0 kcal</small></article>
           <article class="history-summary-card"><span>累計記録</span><strong id="history-total-count">0回</strong><small id="history-total-energy">0.0 kcal</small></article>
         </div>
+        <div class="period-summary" aria-label="期間ごとの記録">
+          <article><span>今週</span><strong id="week-count">0回</strong><small id="week-days">0日記録</small></article>
+          <article><span>今月</span><strong id="month-count">0回</strong><small id="month-days">0日記録</small></article>
+        </div>
+        <section class="history-chart" aria-labelledby="weekly-chart-title">
+          <div><strong id="weekly-chart-title">最近7日間</strong><span id="weekly-chart-total">合計 0回</span></div>
+          <div id="weekly-chart-bars" class="weekly-chart-bars" aria-label="最近7日間のスクワット回数"></div>
+        </section>
         <div id="history-list" class="history-list"></div>
         <div id="history-empty" class="empty-state"><span>🗓️</span><h2>まだ記録がありません</h2><p>ホームから最初のスクワットを記録しましょう。</p></div>
       </section>
@@ -69,6 +77,7 @@
       <section id="settings-page" class="page" aria-label="設定">
         <article class="settings-card"><label for="goal-input">1日の目標回数</label><div class="goal-control"><button id="goal-minus" aria-label="目標を減らす">−</button><input id="goal-input" type="number" inputmode="numeric" min="5" max="500" step="5" value="30" aria-label="1日の目標回数" /><span>回</span><button id="goal-plus" aria-label="目標を増やす">＋</button></div></article>
         <article class="settings-card"><label for="weight-input">体重</label><div class="weight-control"><input id="weight-input" type="number" inputmode="decimal" min="20" max="300" step="0.1" value="60" aria-label="体重" /><span>kg</span></div><p class="input-hint">太もも計測時のアクティブエネルギー概算に使います。</p></article>
+        <article class="settings-card"><label for="motion-mode-input">太もも計測の感度</label><select id="motion-mode-input" class="settings-input"><option value="standard">標準</option><option value="slow">ゆっくり</option><option value="deep">深くしゃがむ</option></select><p id="motion-mode-hint" class="input-hint"></p></article>
         <article class="settings-card talk-coach-link-settings">
           <strong>Talk Coach連携</strong>
           <p class="input-hint">Quick Deckの「スマホ用設定をコピー」で取得した連携設定を貼り付けます。</p>
@@ -134,6 +143,7 @@
       </section>
       <div class="motion-guide"><span>直立</span><b>→</b><span>水平でOK</span><b>→</b><span>直立で+1</span></div>
       <button id="motion-begin-button" class="primary-button" type="button">基準をセットして開始</button>
+      <button id="motion-undo-button" class="motion-undo-button" type="button" hidden>↶ 直前の1回を取り消す</button>
       <button id="motion-finish-button" class="secondary-button" type="button" hidden>終了して記録へ</button>
     </dialog>
     <dialog id="motion-resume-dialog" class="motion-resume-dialog">
