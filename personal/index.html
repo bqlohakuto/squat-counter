@@ -121,6 +121,7 @@
         <section class="motion-counter" aria-labelledby="motion-title">
           <div><strong id="motion-title">太ももで自動計測</strong><p>背面を太ももへ当て、スマホ上部を下にして使います。</p></div>
           <button type="button" id="motion-open-button" class="motion-button">計測画面を開く</button>
+          <button type="button" id="camera-open-button" class="motion-button">カメラで頭の位置を計測</button>
         </section>
         <label class="form-label" for="performed-at-input">日時</label>
         <input id="performed-at-input" type="datetime-local" />
@@ -158,6 +159,14 @@
       <button id="motion-undo-button" class="motion-undo-button" type="button" hidden>↶ 直前の1回を取り消す</button>
       <button id="motion-finish-button" class="secondary-button" type="button" hidden>終了して記録へ</button>
     </dialog>
+    <dialog id="camera-dialog" class="camera-dialog">
+      <button id="camera-close-button" class="close-button" aria-label="カメラ計測を閉じる">×</button>
+      <p class="motion-dialog-kicker">HEAD POSITION COUNTER</p><h2>机に置いて一緒にスクワット</h2>
+      <div class="camera-stage"><video id="camera-video" autoplay muted playsinline></video><div class="camera-guide"><i></i><span id="camera-guide-label">机に置き、頭と肩を映してください</span></div><div class="camera-staff-stage"><img id="camera-staff-image" src="../a_clean_cutout_transparent_background_illustration.png" alt="一緒にスクワットするスタッフ" /></div></div>
+      <div class="camera-live"><article><span>現在の回数</span><strong id="camera-count">0</strong><small>回</small></article><article><span>姿勢</span><strong id="camera-phase">準備中</strong><small id="camera-status">カメラを開始してください</small></article></div>
+      <p class="camera-note">スマホを机などに固定して使います。映像は端末内で頭の上下動を検出するためだけに使い、保存・送信しません。振動は行いません。</p>
+      <button id="camera-start-button" class="primary-button" type="button">カメラを開始</button><button id="camera-finish-button" class="secondary-button" type="button" hidden>終了して記録へ</button>
+    </dialog>
     <dialog id="motion-resume-dialog" class="motion-resume-dialog">
       <p class="motion-dialog-kicker">MEASUREMENT PAUSED</p><h2>計測を再開しますか？</h2>
       <p>ページを離れたため、計測を一時停止しました。中断中の時間は計測時間に含まれません。</p>
@@ -169,6 +178,6 @@
     <script src="https://www.gstatic.com/firebasejs/12.19.0/firebase-auth-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/12.19.0/firebase-database-compat.js"></script>
     <script src="penalty-sync.js"></script>
-    <script src="app.js"></script>
+    <script src="../camera-counter.js"></script><script src="app.js"></script>
   </body>
 </html>

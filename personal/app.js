@@ -213,6 +213,7 @@ function render() {
   document.querySelector("#motion-mode-hint").textContent = motionMode().description;
   document.querySelector("#home-staff-image").src = activeStaff.image;
   document.querySelector("#home-staff-image").alt = `${staffName(activeStaff)}がバーカウンターに立つ`;
+  document.querySelector(".character-portrait").classList.toggle("staff-squatting", Boolean(activeCompanion()));
   document.querySelector("#maid-name").textContent = staffName(activeStaff);
   document.querySelector("#staff-dialog-image").src = activeStaff.image;
   document.querySelector("#staff-dialog-image").alt = `${staffName(activeStaff)}の全身イラスト`;
@@ -417,6 +418,11 @@ function interruptMotionCounter() {
   if (document.querySelector("#motion-resume-dialog").open) document.querySelector("#motion-resume-dialog").close();
   if (document.querySelector("#motion-dialog").open) document.querySelector("#motion-dialog").close();
 }
+function openCameraCounter() {
+  if (!window.CameraCounter) return toast("カメラ計測の準備中です。少し待ってからもう一度お試しください。");
+  const staff = selectedStaff(); document.querySelector("#record-dialog").close();
+  window.CameraCounter.open({ staff: { ...staff, name: staffName(staff) }, onFinish: result => openRecordDialog(null, result.count, { durationSeconds: result.durationSeconds, activeEnergy: activeEnergy(result.durationSeconds) }, "カメラ計測") });
+}
 function openMotionCounter() {
   motionOriginRecord = editingRecordId ? data.records.find(record => record.id === editingRecordId) : null;
   document.querySelector("#record-dialog").close();
@@ -447,6 +453,7 @@ function finishMotionCounter() {
   if (count) openRecordDialog(motionOriginRecord, count, result, penaltyConsumed ? "Talk Coach ペナルティ" : "");
 }
 document.querySelector("#motion-open-button").onclick = openMotionCounter;
+document.querySelector("#camera-open-button").onclick = openCameraCounter;
 document.querySelector("#motion-begin-button").onclick = startMotionCounter;
 document.querySelector("#motion-finish-button").onclick = finishMotionCounter;
 document.querySelector("#motion-undo-button").onclick = undoLastMotionCount;
