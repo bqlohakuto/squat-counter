@@ -1,7 +1,7 @@
 const STORAGE_KEY = "squat-maid-data-v1";
 const AUTO_BACKUP_KEY = `${STORAGE_KEY}-auto-recovery-v1`;
 const SQUAT_MET = 5;
-const BACKUP_VERSION = 3;
+const BACKUP_VERSION = 4;
 const MAIDS = [
   { id: "luna", name: "ルナ", role: "カウンター担当", threshold: 0, image: "../a_clean_cutout_transparent_background_illustration.png" },
   { id: "mirei", name: "ミレイ", role: "もうひとりのスタッフ", threshold: 1000, image: "../staff-2.png" },
@@ -37,7 +37,7 @@ let penaltyState = { target: 0, completed: 0, remaining: 0, status: "idle" };
 let penaltySyncStatus = "unconfigured";
 let previousPenaltyRemaining = null;
 
-function defaultData() { return { goal: 30, maidName: "ルナ", staffNames: {}, selectedStaffId: "luna", weightKg: 60, motionMode: "standard", purchases: ["plant"], records: [] }; }
+function defaultData() { return { goal: 30, maidName: "ルナ", staffNames: {}, selectedStaffId: "luna", weightKg: 60, motionMode: "standard", purchases: ["plant"], coinSpent: 0, companion: null, records: [] }; }
 function readSavedValue(key) { try { const value = JSON.parse(localStorage.getItem(key)); return value && typeof value === "object" ? value : null; } catch { return null; } }
 function savedData(value) { return value && typeof value === "object" && Array.isArray(value.records) ? value : null; }
 function loadData() {
@@ -71,6 +71,8 @@ function normalizeImportedData(candidate) {
     weightKg: Math.min(300, Math.max(20, Number.parseFloat(candidate.weightKg) || 60)),
     motionMode: MOTION_MODES[candidate.motionMode] ? candidate.motionMode : "standard",
     purchases: [...new Set(Array.isArray(candidate.purchases) ? candidate.purchases : ["plant"])].filter(id => BAR_SHOP.some(item => item.id === id)),
+    coinSpent: Math.max(0, Number(candidate.coinSpent) || 0),
+    companion: MAIDS.some(staff => staff.id === candidate.companion?.staffId) ? { staffId: candidate.companion.staffId, startedAt: Number(candidate.companion.startedAt) || Date.now() } : null,
     records: candidate.records.map(record => ({
       id: String(record.id || crypto.randomUUID()),
       count: Math.min(500, Math.max(1, Number.parseInt(record.count, 10) || 1)),
@@ -85,7 +87,7 @@ function dayKey(value) { const d = new Date(value); return `${d.getFullYear()}-$
 function todayKey() { return dayKey(Date.now()); }
 function total() { return data.records.reduce((sum, record) => sum + record.count, 0); }
 function ownedShopItems() { return new Set(Array.isArray(data.purchases) ? data.purchases : []); }
-function coinsSpent() { const owned = ownedShopItems(); return BAR_SHOP.reduce((sum, item) => sum + (owned.has(item.id) ? item.cost : 0), 0); }
+function coinsSpent() { const owned = ownedShopItems(); return BAR_SHOP.reduce((sum, item) => sum + (owned.has(item.id) ? item.cost : 0), 0) + Math.max(0, Number(data.coinSpent) || 0); }
 function coinBalance() { return Math.max(0, total() - coinsSpent()); }
 function renderBarDecor() {
   const owned = ownedShopItems();
@@ -97,6 +99,30 @@ function buyBarItem(id) {
   if (coinBalance() < item.cost) return toast(`あと ${item.cost - coinBalance()} coin 必要です。`);
   data.purchases = [...ownedShopItems(), id]; saveData(); render();
   toast(`${item.icon} ${item.name}をバーに設置しました。`);
+}
+function drinkForStaff(staff) { return ({ luna: "シトラスジンフィズ", mirei: "スパイスハイボール", manager: "ベルモットソーダ" })[staff.id] ?? "おすすめの一杯"; }
+function activeCompanion() { const staff = MAIDS.find(candidate => candidate.id === data.companion?.staffId); return staff && isStaffUnlocked(staff) ? staff : null; }
+function companionLine(staff) { return ({ luna: "一緒なら、もう少しだけ頑張れそう。", mirei: "よし、並んでいこう！", manager: "ペースを合わせましょう。" })[staff.id] ?? "一緒にいきましょう。"; }
+function startCompanionSession() {
+  const staff = selectedStaff(); if (activeCompanion()) return toast("乾杯セッションが進行中です。次の記録を完了してください。");
+  if (coinBalance() < 50) return toast(`あと ${50 - coinBalance()} coin 必要です。`);
+  data.coinSpent = Math.max(0, Number(data.coinSpent) || 0) + 50; data.companion = { staffId: staff.id, startedAt: Date.now() }; saveData(); render();
+  toast(`🥂 ${staffName(staff)}へ${drinkForStaff(staff)}を振る舞いました。次は一緒にスクワット！`);
+}
+function renderCompanionSession() {
+  const card = document.querySelector("#companion-session"), staff = activeCompanion(); card.hidden = !staff;
+  if (!staff) return;
+  document.querySelector("#companion-session-title").textContent = `${staffName(staff)}と一緒にスクワット`;
+  document.querySelector("#companion-session-copy").textContent = `${drinkForStaff(staff)}で乾杯済み。次の記録を一緒に完了しましょう。`;
+}
+function renderCompanionShop() {
+  const root = document.querySelector("#companion-shop"), staff = selectedStaff(), companion = activeCompanion(), balance = coinBalance(); root.innerHTML = "";
+  const card = document.createElement("article"); card.className = "companion-shop-card";
+  card.innerHTML = `<span>🥃</span><div><small>選択中のスタッフ: ${escapeHtml(staffName(staff))}</small><strong>${escapeHtml(drinkForStaff(staff))}を振る舞う</strong><p>50 coinで、次のスクワット記録をスタッフと一緒に行えます。</p></div>`;
+  const button = document.createElement("button"); button.type = "button";
+  if (companion) { button.disabled = true; button.textContent = `${staffName(companion)}と進行中`; }
+  else { button.disabled = balance < 50; button.textContent = "50 coinで乾杯"; button.onclick = startCompanionSession; }
+  card.append(button); root.append(card);
 }
 function todayTotal() { return data.records.filter(record => dayKey(record.createdAt) === todayKey()).reduce((sum, record) => sum + record.count, 0); }
 function activeEnergy(seconds, weightKg = data.weightKg) { return Math.max(0, (SQUAT_MET - 1) * 3.5 * weightKg / 200 * (seconds / 60)); }
@@ -190,7 +216,7 @@ function render() {
   document.querySelector("#maid-name").textContent = staffName(activeStaff);
   document.querySelector("#staff-dialog-image").src = activeStaff.image;
   document.querySelector("#staff-dialog-image").alt = `${staffName(activeStaff)}の全身イラスト`;
-  renderBarDecor(); renderHistory(); renderCollection(all); renderPenaltyUi();
+  renderBarDecor(); renderCompanionSession(); renderHistory(); renderCollection(all); renderPenaltyUi();
 }
 function renderHistory() {
   const list = document.querySelector("#history-list"), empty = document.querySelector("#history-empty");
@@ -247,6 +273,7 @@ function renderCollection(all) {
     } else card.innerHTML = `<div class="staff-select-main"><span class="staff-lock-avatar">🔒</span><span><strong>？？？</strong><small>${staffUnlockLabel(staff)}</small></span><b>🔒</b></div>`;
     list.append(card);
   });
+  renderCompanionShop();
   renderShop();
   renderUnlocks("#reward-list", REWARDS, all);
 }
@@ -295,6 +322,7 @@ function openRecordDialog(record = null, presetCount = null, motionResult = null
   document.querySelector("#record-dialog").showModal();
 }
 document.querySelector("#add-record-button").onclick = () => openRecordDialog();
+document.querySelector("#companion-record-button").onclick = () => { if (activeCompanion()) openRecordDialog(); };
 document.querySelector("#share-button").onclick = () => { const message = `今日はスクワットを${todayTotal()}回やった。\n#SQUATBAR #スクワット`; window.open(`https://x.com/intent/post?text=${encodeURIComponent(message)}`, "_blank", "noopener,noreferrer"); };
 function normalizedCount(value) { return Math.min(500, Math.max(1, Number.parseInt(value, 10) || 1)); }
 function setInputCount(value) { inputCount = normalizedCount(value); document.querySelector("#count-input").value = inputCount; }
@@ -431,7 +459,7 @@ document.addEventListener("visibilitychange", () => {
   if (document.hidden) pauseMotionCounter();
   else if (motionState?.started && motionState.phase === "paused" && document.querySelector("#motion-dialog").open && !document.querySelector("#motion-resume-dialog").open) document.querySelector("#motion-resume-dialog").showModal();
 });
-document.querySelector("#record-form").addEventListener("submit", event => { event.preventDefault(); const unlockedBefore = unlockedStaffIds(); setInputCount(document.querySelector("#count-input").value); const before = todayTotal(); const createdAt = new Date(document.querySelector("#performed-at-input").value).getTime() || Date.now(); const memo = document.querySelector("#memo-input").value.trim(); const existing = data.records.find(record => record.id === editingRecordId); if (existing) { existing.count = inputCount; existing.memo = memo; existing.createdAt = createdAt; if (pendingMotionResult) Object.assign(existing, pendingMotionResult); } else { data.records.push({ id: crypto.randomUUID(), count: inputCount, memo, createdAt, ...(pendingMotionResult ?? {}) }); } const newlyUnlocked = [...unlockedStaffIds()].filter(id => !unlockedBefore.has(id)); saveData(); document.querySelector("#record-dialog").close(); document.querySelector("#memo-input").value = ""; const wasEditing = editingRecordId !== null; editingRecordId = null; pendingMotionResult = null; render(); const activeStaff = selectedStaff(); if (!wasEditing) toast((before < data.goal && todayTotal() >= data.goal ? `✦ ${staffName(activeStaff)}「${dialogueFor(activeStaff, data.goal, data.goal)}」` : `${staffName(activeStaff)}「${recordReactionFor(activeStaff, inputCount)}」`) + ` +${inputCount} coin`); showUnlockDialog(newlyUnlocked); });
+document.querySelector("#record-form").addEventListener("submit", event => { event.preventDefault(); const unlockedBefore = unlockedStaffIds(); setInputCount(document.querySelector("#count-input").value); const before = todayTotal(); const companion = activeCompanion(); const createdAt = new Date(document.querySelector("#performed-at-input").value).getTime() || Date.now(); const memo = document.querySelector("#memo-input").value.trim(); const existing = data.records.find(record => record.id === editingRecordId); if (existing) { existing.count = inputCount; existing.memo = memo; existing.createdAt = createdAt; if (pendingMotionResult) Object.assign(existing, pendingMotionResult); } else { data.records.push({ id: crypto.randomUUID(), count: inputCount, memo, createdAt, ...(pendingMotionResult ?? {}) }); } const newlyUnlocked = [...unlockedStaffIds()].filter(id => !unlockedBefore.has(id)); if (!existing && companion) data.companion = null; saveData(); document.querySelector("#record-dialog").close(); document.querySelector("#memo-input").value = ""; const wasEditing = editingRecordId !== null; editingRecordId = null; pendingMotionResult = null; render(); const activeStaff = selectedStaff(); if (!wasEditing) toast((before < data.goal && todayTotal() >= data.goal ? `✦ ${staffName(activeStaff)}「${dialogueFor(activeStaff, data.goal, data.goal)}」` : `${staffName(activeStaff)}「${recordReactionFor(activeStaff, inputCount)}」`) + ` +${inputCount} coin`); if (!wasEditing && companion) window.setTimeout(() => toast(`🥂 ${staffName(companion)}「${companionLine(companion)}」`), 420); showUnlockDialog(newlyUnlocked); });
 document.querySelector("#goal-minus").onclick = () => { data.goal = Math.max(5, data.goal - 5); saveData(); render(); };
 document.querySelector("#goal-plus").onclick = () => { data.goal = Math.min(500, data.goal + 5); saveData(); render(); };
 document.querySelector("#goal-input").addEventListener("change", event => { data.goal = Math.min(500, Math.max(5, Number.parseInt(event.target.value, 10) || 5)); saveData(); render(); });
