@@ -84,6 +84,7 @@
   function open({ staff, onFinish }) {
     stopCamera(); state = { running: false, count: 0, phase: "idle", samples: [], startedAt: 0, baseline: 0, lastCountAt: 0, stream: null, onFinish };
     el("camera-staff-image").src = staff.image; el("camera-staff-image").alt = `${staff.name}が一緒にスクワットしています`;
+    el("camera-staff-squat-image").src = staff.squatImage || staff.image;
     updateUi("スマホを机に置き、頭と肩をガイド内へ入れてください。"); el("camera-dialog").showModal();
   }
   function init() {

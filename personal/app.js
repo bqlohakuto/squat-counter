@@ -3,9 +3,9 @@ const AUTO_BACKUP_KEY = `${STORAGE_KEY}-auto-recovery-v1`;
 const SQUAT_MET = 5;
 const BACKUP_VERSION = 4;
 const MAIDS = [
-  { id: "luna", name: "ルナ", role: "カウンター担当", threshold: 0, image: "../a_clean_cutout_transparent_background_illustration.png" },
-  { id: "mirei", name: "ミレイ", role: "もうひとりのスタッフ", threshold: 1000, image: "../staff-2.png" },
-  { id: "manager", name: "店長", role: "SQUAT BAR 店長", image: "../staff-manager.png", unlock: "high-streak" }
+  { id: "luna", name: "ルナ", role: "カウンター担当", threshold: 0, image: "../a_clean_cutout_transparent_background_illustration.png", squatImage: "../staff-luna-squat-v1.png" },
+  { id: "mirei", name: "ミレイ", role: "もうひとりのスタッフ", threshold: 1000, image: "../staff-2.png", squatImage: "../staff-mirei-squat-v1.png" },
+  { id: "manager", name: "店長", role: "SQUAT BAR 店長", image: "../staff-manager.png", squatImage: "../staff-manager-squat-v1.png", unlock: "high-streak" }
 ];
 const REWARDS = [
   { name: "お祝いのリボン", role: "累計100回で解放", icon: "🎀", threshold: 100 },
@@ -213,6 +213,7 @@ function render() {
   document.querySelector("#motion-mode-hint").textContent = motionMode().description;
   document.querySelector("#home-staff-image").src = activeStaff.image;
   document.querySelector("#home-staff-image").alt = `${staffName(activeStaff)}がバーカウンターに立つ`;
+  document.querySelector("#home-staff-squat-image").src = activeStaff.squatImage;
   document.querySelector(".character-portrait").classList.toggle("staff-squatting", Boolean(activeCompanion()));
   document.querySelector("#maid-name").textContent = staffName(activeStaff);
   document.querySelector("#staff-dialog-image").src = activeStaff.image;
