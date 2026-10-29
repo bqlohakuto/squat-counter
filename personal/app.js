@@ -1,7 +1,7 @@
 const STORAGE_KEY = "squat-maid-data-v1";
 const AUTO_BACKUP_KEY = `${STORAGE_KEY}-auto-recovery-v1`;
 const SQUAT_MET = 5;
-const BACKUP_VERSION = 2;
+const BACKUP_VERSION = 3;
 const MAIDS = [
   { id: "luna", name: "ルナ", role: "カウンター担当", threshold: 0, image: "../a_clean_cutout_transparent_background_illustration.png" },
   { id: "mirei", name: "ミレイ", role: "もうひとりのスタッフ", threshold: 1000, image: "../staff-2.png" },
@@ -11,6 +11,12 @@ const REWARDS = [
   { name: "お祝いのリボン", role: "累計100回で解放", icon: "🎀", threshold: 100 },
   { name: "ごほうびティータイム", role: "累計300回で解放", icon: "☕", threshold: 300 },
   { name: "中庭の背景", role: "累計1,000回で解放", icon: "🌳", threshold: 1000 }
+];
+const BAR_SHOP = [
+  { id: "plant", name: "カウンターグリーン", detail: "カウンター右側に鉢植えを置きます。", icon: "🌿", cost: 0 },
+  { id: "lamp", name: "アンバーランプ", detail: "柔らかな灯りをカウンター左に加えます。", icon: "💡", cost: 150 },
+  { id: "bottles", name: "ボトルディスプレイ", detail: "バックバーにきらめくボトルを増やします。", icon: "🍸", cost: 350 },
+  { id: "runner", name: "ベルベットランナー", detail: "カウンターに深紅のアクセントを敷きます。", icon: "♦", cost: 700 }
 ];
 const BAR_RANKS = [
   { name: "BAR ビギナー", threshold: 0 }, { name: "カウンター常連", threshold: 100 }, { name: "ナイト・トレーニー", threshold: 300 }, { name: "SQUAT BAR VIP", threshold: 1000 }, { name: "レジェンド", threshold: 3000 }
@@ -31,7 +37,7 @@ let penaltyState = { target: 0, completed: 0, remaining: 0, status: "idle" };
 let penaltySyncStatus = "unconfigured";
 let previousPenaltyRemaining = null;
 
-function defaultData() { return { goal: 30, maidName: "ルナ", staffNames: {}, selectedStaffId: "luna", weightKg: 60, motionMode: "standard", records: [] }; }
+function defaultData() { return { goal: 30, maidName: "ルナ", staffNames: {}, selectedStaffId: "luna", weightKg: 60, motionMode: "standard", purchases: ["plant"], records: [] }; }
 function readSavedValue(key) { try { const value = JSON.parse(localStorage.getItem(key)); return value && typeof value === "object" ? value : null; } catch { return null; } }
 function savedData(value) { return value && typeof value === "object" && Array.isArray(value.records) ? value : null; }
 function loadData() {
@@ -64,6 +70,7 @@ function normalizeImportedData(candidate) {
     selectedStaffId,
     weightKg: Math.min(300, Math.max(20, Number.parseFloat(candidate.weightKg) || 60)),
     motionMode: MOTION_MODES[candidate.motionMode] ? candidate.motionMode : "standard",
+    purchases: [...new Set(Array.isArray(candidate.purchases) ? candidate.purchases : ["plant"])].filter(id => BAR_SHOP.some(item => item.id === id)),
     records: candidate.records.map(record => ({
       id: String(record.id || crypto.randomUUID()),
       count: Math.min(500, Math.max(1, Number.parseInt(record.count, 10) || 1)),
@@ -77,6 +84,20 @@ function normalizeImportedData(candidate) {
 function dayKey(value) { const d = new Date(value); return `${d.getFullYear()}-${d.getMonth()}-${d.getDate()}`; }
 function todayKey() { return dayKey(Date.now()); }
 function total() { return data.records.reduce((sum, record) => sum + record.count, 0); }
+function ownedShopItems() { return new Set(Array.isArray(data.purchases) ? data.purchases : []); }
+function coinsSpent() { const owned = ownedShopItems(); return BAR_SHOP.reduce((sum, item) => sum + (owned.has(item.id) ? item.cost : 0), 0); }
+function coinBalance() { return Math.max(0, total() - coinsSpent()); }
+function renderBarDecor() {
+  const owned = ownedShopItems();
+  document.querySelector("#bar-plant").hidden = !owned.has("plant");
+  ["lamp", "bottles", "runner"].forEach(id => { document.querySelector(`#bar-upgrade-${id}`).hidden = !owned.has(id); });
+}
+function buyBarItem(id) {
+  const item = BAR_SHOP.find(candidate => candidate.id === id); if (!item || ownedShopItems().has(id)) return;
+  if (coinBalance() < item.cost) return toast(`あと ${item.cost - coinBalance()} coin 必要です。`);
+  data.purchases = [...ownedShopItems(), id]; saveData(); render();
+  toast(`${item.icon} ${item.name}をバーに設置しました。`);
+}
 function todayTotal() { return data.records.filter(record => dayKey(record.createdAt) === todayKey()).reduce((sum, record) => sum + record.count, 0); }
 function activeEnergy(seconds, weightKg = data.weightKg) { return Math.max(0, (SQUAT_MET - 1) * 3.5 * weightKg / 200 * (seconds / 60)); }
 function formatEnergy(value) { return `${Number(value || 0).toFixed(1)} kcal`; }
@@ -158,6 +179,7 @@ function render() {
   document.querySelector("#encouragement").textContent = dialogueFor(activeStaff, current, data.goal);
   document.querySelector("#achievement-badge").hidden = !achieved;
   document.querySelector("#collection-total").textContent = all;
+  document.querySelector("#coin-balance").textContent = coinBalance();
   document.querySelector("#goal-input").value = data.goal;
   document.querySelector("#weight-input").value = data.weightKg;
   document.querySelector("#auto-backup-status").textContent = autoBackupStatus();
@@ -168,7 +190,7 @@ function render() {
   document.querySelector("#maid-name").textContent = staffName(activeStaff);
   document.querySelector("#staff-dialog-image").src = activeStaff.image;
   document.querySelector("#staff-dialog-image").alt = `${staffName(activeStaff)}の全身イラスト`;
-  renderHistory(); renderCollection(all); renderPenaltyUi();
+  renderBarDecor(); renderHistory(); renderCollection(all); renderPenaltyUi();
 }
 function renderHistory() {
   const list = document.querySelector("#history-list"), empty = document.querySelector("#history-empty");
@@ -225,7 +247,19 @@ function renderCollection(all) {
     } else card.innerHTML = `<div class="staff-select-main"><span class="staff-lock-avatar">🔒</span><span><strong>？？？</strong><small>${staffUnlockLabel(staff)}</small></span><b>🔒</b></div>`;
     list.append(card);
   });
+  renderShop();
   renderUnlocks("#reward-list", REWARDS, all);
+}
+function renderShop() {
+  const root = document.querySelector("#shop-list"), balance = coinBalance(), owned = ownedShopItems(); root.innerHTML = "";
+  BAR_SHOP.forEach(item => {
+    const purchased = owned.has(item.id); const card = document.createElement("article"); card.className = `shop-item ${purchased ? "owned" : ""}`;
+    card.innerHTML = `<span class="shop-icon">${item.icon}</span><div><strong>${item.name}</strong><small>${item.detail}</small></div>`;
+    const button = document.createElement("button"); button.type = "button";
+    if (purchased) { button.className = "shop-owned"; button.textContent = "設置済み"; button.disabled = true; }
+    else { button.className = "shop-buy"; button.textContent = `${item.cost} coin`; button.disabled = balance < item.cost; button.setAttribute("aria-label", `${item.name}を${item.cost} coinで購入`); button.onclick = () => buyBarItem(item.id); }
+    card.append(button); root.append(card);
+  });
 }
 function unlockedStaffIds() { const all = total(); return new Set(MAIDS.filter(staff => isStaffUnlocked(staff, all)).map(staff => staff.id)); }
 function showUnlockDialog(ids) {
@@ -397,7 +431,7 @@ document.addEventListener("visibilitychange", () => {
   if (document.hidden) pauseMotionCounter();
   else if (motionState?.started && motionState.phase === "paused" && document.querySelector("#motion-dialog").open && !document.querySelector("#motion-resume-dialog").open) document.querySelector("#motion-resume-dialog").showModal();
 });
-document.querySelector("#record-form").addEventListener("submit", event => { event.preventDefault(); const unlockedBefore = unlockedStaffIds(); setInputCount(document.querySelector("#count-input").value); const before = todayTotal(); const createdAt = new Date(document.querySelector("#performed-at-input").value).getTime() || Date.now(); const memo = document.querySelector("#memo-input").value.trim(); const existing = data.records.find(record => record.id === editingRecordId); if (existing) { existing.count = inputCount; existing.memo = memo; existing.createdAt = createdAt; if (pendingMotionResult) Object.assign(existing, pendingMotionResult); } else { data.records.push({ id: crypto.randomUUID(), count: inputCount, memo, createdAt, ...(pendingMotionResult ?? {}) }); } const newlyUnlocked = [...unlockedStaffIds()].filter(id => !unlockedBefore.has(id)); saveData(); document.querySelector("#record-dialog").close(); document.querySelector("#memo-input").value = ""; const wasEditing = editingRecordId !== null; editingRecordId = null; pendingMotionResult = null; render(); const activeStaff = selectedStaff(); if (!wasEditing) toast(before < data.goal && todayTotal() >= data.goal ? `✦ ${staffName(activeStaff)}「${dialogueFor(activeStaff, data.goal, data.goal)}」` : `${staffName(activeStaff)}「${recordReactionFor(activeStaff, inputCount)}」`); showUnlockDialog(newlyUnlocked); });
+document.querySelector("#record-form").addEventListener("submit", event => { event.preventDefault(); const unlockedBefore = unlockedStaffIds(); setInputCount(document.querySelector("#count-input").value); const before = todayTotal(); const createdAt = new Date(document.querySelector("#performed-at-input").value).getTime() || Date.now(); const memo = document.querySelector("#memo-input").value.trim(); const existing = data.records.find(record => record.id === editingRecordId); if (existing) { existing.count = inputCount; existing.memo = memo; existing.createdAt = createdAt; if (pendingMotionResult) Object.assign(existing, pendingMotionResult); } else { data.records.push({ id: crypto.randomUUID(), count: inputCount, memo, createdAt, ...(pendingMotionResult ?? {}) }); } const newlyUnlocked = [...unlockedStaffIds()].filter(id => !unlockedBefore.has(id)); saveData(); document.querySelector("#record-dialog").close(); document.querySelector("#memo-input").value = ""; const wasEditing = editingRecordId !== null; editingRecordId = null; pendingMotionResult = null; render(); const activeStaff = selectedStaff(); if (!wasEditing) toast((before < data.goal && todayTotal() >= data.goal ? `✦ ${staffName(activeStaff)}「${dialogueFor(activeStaff, data.goal, data.goal)}」` : `${staffName(activeStaff)}「${recordReactionFor(activeStaff, inputCount)}」`) + ` +${inputCount} coin`); showUnlockDialog(newlyUnlocked); });
 document.querySelector("#goal-minus").onclick = () => { data.goal = Math.max(5, data.goal - 5); saveData(); render(); };
 document.querySelector("#goal-plus").onclick = () => { data.goal = Math.min(500, data.goal + 5); saveData(); render(); };
 document.querySelector("#goal-input").addEventListener("change", event => { data.goal = Math.min(500, Math.max(5, Number.parseInt(event.target.value, 10) || 5)); saveData(); render(); });
