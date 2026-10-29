@@ -1,5 +1,5 @@
-const CACHE = "squat-bar-v22";
-const ASSETS = ["./", "./index.html", "./style.css", "./app.js", "./penalty-sync.js", "./manifest.webmanifest", "./app-icon.jpg", "./a_clean_cutout_transparent_background_illustration.png", "./staff-2.png", "./staff-manager.png"];
+const CACHE = "squat-bar-general-v1";
+const ASSETS = ["./", "./index.html", "./style.css", "./app.js", "./manifest.webmanifest", "./app-icon.jpg", "./a_clean_cutout_transparent_background_illustration.png", "./staff-2.png", "./staff-manager.png"];
 self.addEventListener("install", event => event.waitUntil(caches.open(CACHE).then(cache => cache.addAll(ASSETS)).then(() => self.skipWaiting())));
-self.addEventListener("activate", event => event.waitUntil(caches.keys().then(keys => Promise.all(keys.filter(key => key !== CACHE).map(key => caches.delete(key)))).then(() => self.clients.claim())));
+self.addEventListener("activate", event => event.waitUntil(caches.keys().then(keys => Promise.all(keys.filter(key => key !== CACHE && (key.startsWith("squat-bar-general-") || key.startsWith("squat-bar-v"))).map(key => caches.delete(key)))).then(() => self.clients.claim())));
 self.addEventListener("fetch", event => event.respondWith(caches.match(event.request).then(response => response || fetch(event.request))));

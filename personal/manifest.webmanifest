@@ -1,0 +1,9 @@
+{
+  "name": "SQUAT BAR PERSONAL",
+  "short_name": "BAR PERSONAL",
+  "start_url": "./",
+  "display": "standalone",
+  "background_color": "#f7f5fb",
+  "theme_color": "#6e4bc6",
+  "icons": [{ "src": "../app-icon.jpg", "sizes": "1254x1254", "type": "image/jpeg", "purpose": "any maskable" }]
+}

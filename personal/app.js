@@ -1,0 +1,444 @@
+const STORAGE_KEY = "squat-maid-data-v1";
+const SQUAT_MET = 5;
+const BACKUP_VERSION = 2;
+const MAIDS = [
+  { id: "luna", name: "ルナ", role: "カウンター担当", threshold: 0, image: "../a_clean_cutout_transparent_background_illustration.png" },
+  { id: "mirei", name: "ミレイ", role: "もうひとりのスタッフ", threshold: 1000, image: "../staff-2.png" },
+  { id: "manager", name: "店長", role: "SQUAT BAR 店長", image: "../staff-manager.png", unlock: "high-streak" }
+];
+const REWARDS = [
+  { name: "お祝いのリボン", role: "累計100回で解放", icon: "🎀", threshold: 100 },
+  { name: "ごほうびティータイム", role: "累計300回で解放", icon: "☕", threshold: 300 },
+  { name: "中庭の背景", role: "累計1,000回で解放", icon: "🌳", threshold: 1000 }
+];
+const BAR_RANKS = [
+  { name: "BAR ビギナー", threshold: 0 }, { name: "カウンター常連", threshold: 100 }, { name: "ナイト・トレーニー", threshold: 300 }, { name: "SQUAT BAR VIP", threshold: 1000 }, { name: "レジェンド", threshold: 3000 }
+];
+const MOTION_MODES = {
+  standard: { label: "標準", uprightTolerance: 28, horizontalTolerance: 25, minRepMs: 650, description: "通常のテンポ・深さ向けです。" },
+  slow: { label: "ゆっくり", uprightTolerance: 32, horizontalTolerance: 30, minRepMs: 1000, description: "ゆっくり行うときに、連続検出を抑えます。" },
+  deep: { label: "深くしゃがむ", uprightTolerance: 24, horizontalTolerance: 15, minRepMs: 700, description: "より水平に近い姿勢でカウントします。" }
+};
+let data = loadData();
+let inputCount = 10;
+let editingRecordId = null;
+let motionState = null;
+let motionOriginRecord = null;
+let motionTimer = null;
+let pendingMotionResult = null;
+let penaltyState = { target: 0, completed: 0, remaining: 0, status: "idle" };
+let penaltySyncStatus = "unconfigured";
+let previousPenaltyRemaining = null;
+
+function loadData() { try { return { goal: 30, maidName: "ルナ", staffNames: {}, selectedStaffId: "luna", weightKg: 60, motionMode: "standard", records: [], ...JSON.parse(localStorage.getItem(STORAGE_KEY)) }; } catch { return { goal: 30, maidName: "ルナ", staffNames: {}, selectedStaffId: "luna", weightKg: 60, motionMode: "standard", records: [] }; } }
+function saveData() { localStorage.setItem(STORAGE_KEY, JSON.stringify(data)); }
+function backupFileName() { return `squat-bar-backup-${new Date().toISOString().slice(0, 10)}.json`; }
+function backupPayload() { return { version: BACKUP_VERSION, exportedAt: new Date().toISOString(), app: "SQUAT BAR", data }; }
+function normalizeImportedData(candidate) {
+  if (!candidate || typeof candidate !== "object" || !Array.isArray(candidate.records)) throw new Error("invalid backup");
+  const selectedStaffId = MAIDS.some(staff => staff.id === candidate.selectedStaffId) ? candidate.selectedStaffId : "luna";
+  return {
+    goal: Math.min(500, Math.max(5, Number.parseInt(candidate.goal, 10) || 30)),
+    maidName: String(candidate.maidName || "ルナ").trim().slice(0, 20) || "ルナ",
+    staffNames: Object.fromEntries(MAIDS.map(staff => [staff.id, String(candidate.staffNames?.[staff.id] || "").trim().slice(0, 20)]).filter(([, name]) => name)),
+    selectedStaffId,
+    weightKg: Math.min(300, Math.max(20, Number.parseFloat(candidate.weightKg) || 60)),
+    motionMode: MOTION_MODES[candidate.motionMode] ? candidate.motionMode : "standard",
+    records: candidate.records.map(record => ({
+      id: String(record.id || crypto.randomUUID()),
+      count: Math.min(500, Math.max(1, Number.parseInt(record.count, 10) || 1)),
+      memo: String(record.memo || "").slice(0, 80),
+      createdAt: Number.isFinite(Number(record.createdAt)) ? Number(record.createdAt) : Date.now(),
+      ...(Number.isFinite(Number(record.durationSeconds)) ? { durationSeconds: Math.max(0, Number(record.durationSeconds)) } : {}),
+      ...(Number.isFinite(Number(record.activeEnergy)) ? { activeEnergy: Math.max(0, Number(record.activeEnergy)) } : {})
+    }))
+  };
+}
+function dayKey(value) { const d = new Date(value); return `${d.getFullYear()}-${d.getMonth()}-${d.getDate()}`; }
+function todayKey() { return dayKey(Date.now()); }
+function total() { return data.records.reduce((sum, record) => sum + record.count, 0); }
+function todayTotal() { return data.records.filter(record => dayKey(record.createdAt) === todayKey()).reduce((sum, record) => sum + record.count, 0); }
+function activeEnergy(seconds, weightKg = data.weightKg) { return Math.max(0, (SQUAT_MET - 1) * 3.5 * weightKg / 200 * (seconds / 60)); }
+function formatEnergy(value) { return `${Number(value || 0).toFixed(1)} kcal`; }
+function formatDuration(seconds) { const safe = Math.max(0, Math.floor(seconds || 0)); return `${Math.floor(safe / 60)}:${String(safe % 60).padStart(2, "0")}`; }
+function motionMode() { return MOTION_MODES[data.motionMode] ?? MOTION_MODES.standard; }
+function localDayStart(value = new Date()) { const date = new Date(value); date.setHours(0, 0, 0, 0); return date; }
+function recordsSince(start) { return data.records.filter(record => record.createdAt >= start.getTime()); }
+function countAndDays(records) { return { count: records.reduce((sum, record) => sum + record.count, 0), days: new Set(records.map(record => dayKey(record.createdAt))).size }; }
+function highAchievementStreak() {
+  const dailyTotals = new Map();
+  data.records.forEach(record => dailyTotals.set(dayKey(record.createdAt), (dailyTotals.get(dayKey(record.createdAt)) ?? 0) + record.count));
+  let date = new Date(); date.setHours(0, 0, 0, 0);
+  if ((dailyTotals.get(dayKey(date)) ?? 0) < 100) date.setDate(date.getDate() - 1);
+  let count = 0; while ((dailyTotals.get(dayKey(date)) ?? 0) >= 100) { count += 1; date.setDate(date.getDate() - 1); }
+  return count;
+}
+function isStaffUnlocked(staff, all = total()) { return staff.unlock === "high-streak" ? highAchievementStreak() >= 7 : all >= staff.threshold; }
+function staffUnlockLabel(staff) { return staff.unlock === "high-streak" ? `1日100回以上を7日連続で達成（現在 ${Math.min(highAchievementStreak(), 7)} / 7日）` : `累計${staff.threshold}回で解放`; }
+function staffName(staff) { return data.staffNames?.[staff.id] || (staff.id === "luna" ? data.maidName : staff.name); }
+function selectedStaff() { return MAIDS.find(staff => staff.id === data.selectedStaffId) ?? MAIDS[0]; }
+function dialogueFor(staff, current, goal) {
+  const lines = {
+    luna: current >= goal ? "目標クリア。おつかれさま、今日はゆっくりして。" : current === 0 ? "焦らなくていい。できる分から始めよう。" : current < goal / 2 ? "その調子。呼吸を忘れずに。" : "半分まできたね。無理はしないで。",
+    mirei: current >= goal ? "目標達成！ 最高だよ、この勢いでいこう！" : current === 0 ? "準備はいい？ まず一回、いこう！" : current < goal / 2 ? "いいぞ！ まだまだいける！" : "折り返し！ ここからが勝負だよ！",
+    manager: current >= goal ? "目標達成ですね。よくできました。次も丁寧に続けましょう。" : current === 0 ? "姿勢を整えてから始めましょう。回数より質です。" : current < goal / 2 ? "丁寧に。反動に頼らないように。" : "残りも同じフォームで。崩さないこと。"
+  };
+  return lines[staff.id] ?? lines.luna;
+}
+function recordReactionFor(staff, count) {
+  const level = count >= 100 ? "high" : count >= 30 ? "medium" : "low";
+  const lines = {
+    luna: { low: "いいね。少しずつで十分。", medium: "しっかり積み上げたね。えらい。", high: "100回以上……すごいよ。ちゃんと休んで。" },
+    mirei: { low: "いいスタート！ 次もいこう！", medium: "その回数、燃えてきた！", high: "100回超え！ 本気、見せてもらったよ！" },
+    manager: { low: "記録できました。継続が大切です。", medium: "よくできました。フォームも確認しましょう。", high: "見事です。ただし無理は禁物ですよ。" }
+  };
+  return lines[staff.id]?.[level] ?? lines.luna[level];
+}
+function streak() {
+  const days = new Set(data.records.map(record => dayKey(record.createdAt)));
+  let date = new Date(); date.setHours(0,0,0,0);
+  if (!days.has(dayKey(date))) date.setDate(date.getDate() - 1);
+  let count = 0; while (days.has(dayKey(date))) { count++; date.setDate(date.getDate() - 1); }
+  return count;
+}
+function renderPenaltyUi() {
+  const configured = Boolean(window.PenaltySync?.isConfigured());
+  const card = document.querySelector("#talk-coach-penalty-card");
+  const motionCard = document.querySelector("#motion-penalty-live");
+  if (card) card.hidden = !configured;
+  if (motionCard) motionCard.hidden = !configured || penaltyState.target <= 0;
+
+  document.querySelector("#penalty-completed").textContent = penaltyState.completed ?? 0;
+  document.querySelector("#penalty-target").textContent = penaltyState.target ?? 0;
+  document.querySelector("#penalty-remaining").textContent = penaltyState.remaining ?? 0;
+  document.querySelector("#motion-penalty-completed").textContent = penaltyState.completed ?? 0;
+  document.querySelector("#motion-penalty-target").textContent = penaltyState.target ?? 0;
+  document.querySelector("#motion-penalty-remaining").textContent = penaltyState.remaining ?? 0;
+
+  const percent = penaltyState.target > 0 ? Math.min(100, penaltyState.completed / penaltyState.target * 100) : 0;
+  document.querySelector("#penalty-progress").style.width = percent + "%";
+
+  const labels = { connected: "同期中", connecting: "接続中", unconfigured: "未設定", error: "エラー" };
+  document.querySelector("#penalty-sync-status").textContent = labels[penaltySyncStatus] ?? penaltySyncStatus;
+  document.querySelector("#penalty-setup-status").textContent = configured
+    ? (labels[penaltySyncStatus] ?? penaltySyncStatus)
+    : "Quick Deckから連携設定を貼り付けてください。";
+}
+
+function render() {
+  const current = todayTotal(), all = total(), achieved = current >= data.goal;
+  const staff = selectedStaff();
+  if (!isStaffUnlocked(staff, all)) data.selectedStaffId = "luna";
+  const activeStaff = selectedStaff();
+  document.querySelector("#today-count").textContent = `${current} / ${data.goal} 回`;
+  document.querySelector("#total-count").textContent = all;
+  document.querySelector("#streak-count").textContent = streak();
+  document.querySelector("#progress-bar").style.width = `${Math.min(100, current / data.goal * 100)}%`;
+  document.querySelector("#mission-text").textContent = `スクワットを${data.goal}回行う（${Math.min(current, data.goal)} / ${data.goal}）`;
+  document.querySelector("#encouragement").textContent = dialogueFor(activeStaff, current, data.goal);
+  document.querySelector("#achievement-badge").hidden = !achieved;
+  document.querySelector("#collection-total").textContent = all;
+  document.querySelector("#goal-input").value = data.goal;
+  document.querySelector("#weight-input").value = data.weightKg;
+  document.querySelector("#motion-mode-input").value = MOTION_MODES[data.motionMode] ? data.motionMode : "standard";
+  document.querySelector("#motion-mode-hint").textContent = motionMode().description;
+  document.querySelector("#home-staff-image").src = activeStaff.image;
+  document.querySelector("#home-staff-image").alt = `${staffName(activeStaff)}がバーカウンターに立つ`;
+  document.querySelector("#maid-name").textContent = staffName(activeStaff);
+  document.querySelector("#staff-dialog-image").src = activeStaff.image;
+  document.querySelector("#staff-dialog-image").alt = `${staffName(activeStaff)}の全身イラスト`;
+  renderHistory(); renderCollection(all); renderPenaltyUi();
+}
+function renderHistory() {
+  const list = document.querySelector("#history-list"), empty = document.querySelector("#history-empty");
+  const best = data.records.reduce((bestRecord, record) => !bestRecord || record.count > bestRecord.count ? record : bestRecord, null);
+  const energyTotal = data.records.reduce((sum, record) => sum + Number(record.activeEnergy || 0), 0);
+  document.querySelector("#history-best-count").textContent = `${best?.count ?? 0}回`;
+  document.querySelector("#history-best-energy").textContent = formatEnergy(best?.activeEnergy);
+  document.querySelector("#history-total-count").textContent = `${total()}回`;
+  document.querySelector("#history-total-energy").textContent = formatEnergy(energyTotal);
+  const today = localDayStart();
+  const weekStart = new Date(today); weekStart.setDate(today.getDate() - ((today.getDay() + 6) % 7));
+  const monthStart = new Date(today.getFullYear(), today.getMonth(), 1);
+  const week = countAndDays(recordsSince(weekStart));
+  const month = countAndDays(recordsSince(monthStart));
+  document.querySelector("#week-count").textContent = `${week.count}回`;
+  document.querySelector("#week-days").textContent = `${week.days}日記録`;
+  document.querySelector("#month-count").textContent = `${month.count}回`;
+  document.querySelector("#month-days").textContent = `${month.days}日記録`;
+  const chartDays = Array.from({ length: 7 }, (_, index) => { const date = new Date(today); date.setDate(today.getDate() - (6 - index)); return date; });
+  const chartValues = chartDays.map(date => data.records.filter(record => dayKey(record.createdAt) === dayKey(date)).reduce((sum, record) => sum + record.count, 0));
+  const chartMax = Math.max(data.goal, ...chartValues, 1);
+  document.querySelector("#weekly-chart-total").textContent = `合計 ${chartValues.reduce((sum, value) => sum + value, 0)}回`;
+  document.querySelector("#weekly-chart-bars").innerHTML = chartDays.map((date, index) => { const value = chartValues[index]; const height = value ? Math.max(8, Math.round(value / chartMax * 100)) : 2; return `<article title="${date.toLocaleDateString("ja-JP")}: ${value}回"><strong>${value}</strong><i style="height:${height}%"></i><small>${date.getMonth() + 1}/${date.getDate()}</small></article>`; }).join("");
+  list.innerHTML = ""; empty.hidden = data.records.length > 0;
+  [...data.records].sort((a,b) => b.createdAt - a.createdAt).forEach(record => {
+    const d = new Date(record.createdAt); const item = document.createElement("article"); item.className = "history-item";
+    const metrics = record.durationSeconds ? ` · ${formatDuration(record.durationSeconds)} · ${formatEnergy(record.activeEnergy)}` : "";
+    item.innerHTML = `<div class="history-icon">🏋️</div><div class="history-copy"><strong>${record.count} 回</strong><span>${d.toLocaleString("ja-JP", {month:"numeric",day:"numeric",hour:"2-digit",minute:"2-digit"})}${metrics}${record.memo ? ` · ${escapeHtml(record.memo)}` : ""}</span></div><div class="history-actions"><button class="edit-button" aria-label="記録を編集">編集</button><button class="delete-button" aria-label="記録を削除">削除</button></div>`;
+    item.querySelector(".edit-button").onclick = () => openRecordDialog(record);
+    item.querySelector(".delete-button").onclick = () => { data.records = data.records.filter(item => item.id !== record.id); saveData(); render(); };
+    list.append(item);
+  });
+}
+function renderCollection(all) {
+  const rankIndex = BAR_RANKS.reduce((index, rank, candidate) => all >= rank.threshold ? candidate : index, 0);
+  const rank = BAR_RANKS[rankIndex], nextRank = BAR_RANKS[rankIndex + 1];
+  const progress = nextRank ? Math.min(100, (all - rank.threshold) / (nextRank.threshold - rank.threshold) * 100) : 100;
+  document.querySelector("#bar-rank-level").textContent = `RANK ${rankIndex + 1}`;
+  document.querySelector("#bar-rank-name").textContent = rank.name;
+  document.querySelector("#bar-rank-progress").style.width = `${progress}%`;
+  document.querySelector("#bar-rank-next").textContent = nextRank ? `次のランクまで ${Math.max(0, nextRank.threshold - all)}回` : "最高ランクに到達しました";
+  const list = document.querySelector("#staff-list"); list.innerHTML = "";
+  MAIDS.forEach(staff => {
+    const unlocked = isStaffUnlocked(staff, all), selected = staff.id === data.selectedStaffId;
+    const card = document.createElement("article"); card.className = `staff-select-card ${selected ? "selected" : ""} ${unlocked ? "" : "locked"}`;
+    if (unlocked) {
+      const select = document.createElement("button"); select.type = "button"; select.className = "staff-select-main";
+      select.innerHTML = `<img src="${staff.image}" alt="${staffName(staff)}" /><span><strong>${staffName(staff)}</strong><small>${staff.role}</small></span><b>${selected ? "選択中" : "選択"}</b>`;
+      select.onclick = () => { data.selectedStaffId = staff.id; saveData(); render(); };
+      const nameRow = document.createElement("label"); nameRow.className = "staff-card-name-row"; nameRow.innerHTML = "<span>表示名</span>";
+      const input = document.createElement("input"); input.type = "text"; input.maxLength = 20; input.value = staffName(staff); input.setAttribute("aria-label", `${staffName(staff)}の表示名`);
+      input.onchange = event => { const nextName = event.target.value.trim().slice(0, 20) || staff.name; data.staffNames ??= {}; data.staffNames[staff.id] = nextName; if (staff.id === "luna") data.maidName = nextName; saveData(); render(); };
+      nameRow.append(input); card.append(select, nameRow);
+    } else card.innerHTML = `<div class="staff-select-main"><span class="staff-lock-avatar">🔒</span><span><strong>？？？</strong><small>${staffUnlockLabel(staff)}</small></span><b>🔒</b></div>`;
+    list.append(card);
+  });
+  renderUnlocks("#reward-list", REWARDS, all);
+}
+function unlockedStaffIds() { const all = total(); return new Set(MAIDS.filter(staff => isStaffUnlocked(staff, all)).map(staff => staff.id)); }
+function showUnlockDialog(ids) {
+  const staff = MAIDS.filter(item => ids.includes(item.id)); if (!staff.length) return;
+  const list = document.querySelector("#unlock-dialog-list"); list.innerHTML = staff.map(item => `<article><img src="${item.image}" alt="${escapeHtml(staffName(item))}" /><div><strong>${escapeHtml(staffName(item))}</strong><span>${item.role}</span></div></article>`).join("");
+  document.querySelector("#unlock-dialog").showModal();
+}
+function renderUnlocks(selector, items, all, usesMaidName = false) {
+  const root = document.querySelector(selector); root.innerHTML = "";
+  items.forEach((item, index) => { const unlocked = all >= item.threshold; const name = usesMaidName && index === 0 ? data.maidName : item.name; const row = document.createElement("article"); row.className = `unlock-row ${unlocked ? "" : "locked"}`; row.innerHTML = `<div class="unlock-icon">${unlocked ? item.icon : "🔒"}</div><div class="unlock-copy"><strong>${unlocked ? escapeHtml(name) : "？？？"}</strong><span>${unlocked ? item.role : `累計${item.threshold}回で解放`}</span></div><span class="${unlocked ? "unlock-status" : "lock-status"}">${unlocked ? "✓" : "🔒"}</span>`; root.append(row); });
+}
+function escapeHtml(text) { const div = document.createElement("div"); div.textContent = text; return div.innerHTML; }
+function showPage(page) {
+  const titles = { home: "", history: "記録の履歴", collection: "お店のコレクション", settings: "設定" };
+  document.querySelectorAll(".page").forEach(el => el.classList.remove("active")); document.querySelector(`#${page}-page`).classList.add("active");
+  document.querySelector("#page-title").textContent = titles[page];
+  document.querySelectorAll(".tab").forEach(tab => tab.classList.toggle("active", tab.dataset.page === page));
+}
+function toast(message) { const element = document.querySelector("#toast"); element.textContent = message; element.classList.add("show"); setTimeout(() => element.classList.remove("show"), 2600); }
+
+document.querySelectorAll(".tab").forEach(tab => tab.onclick = () => showPage(tab.dataset.page));
+function localDateTimeValue(timestamp) { const date = new Date(timestamp); const offset = date.getTimezoneOffset() * 60_000; return new Date(date - offset).toISOString().slice(0, 16); }
+function openRecordDialog(record = null, presetCount = null, motionResult = null, presetMemo = "") {
+  stopMotionCounter();
+  motionState = null;
+  pendingMotionResult = motionResult;
+  editingRecordId = record?.id ?? null;
+  setInputCount(presetCount ?? record?.count ?? 10);
+  document.querySelector("#memo-input").value = record?.memo ?? presetMemo ?? "";
+  document.querySelector("#performed-at-input").value = localDateTimeValue(record?.createdAt ?? Date.now());
+  document.querySelector("#record-dialog-title").textContent = record ? "記録を編集" : "記録する";
+  document.querySelector("#record-save-button").textContent = record ? "変更を保存" : "保存する";
+  document.querySelector("#record-dialog").showModal();
+}
+document.querySelector("#add-record-button").onclick = () => openRecordDialog();
+document.querySelector("#share-button").onclick = () => { const message = `今日はスクワットを${todayTotal()}回やった。\n#SQUATBAR #スクワット`; window.open(`https://x.com/intent/post?text=${encodeURIComponent(message)}`, "_blank", "noopener,noreferrer"); };
+function normalizedCount(value) { return Math.min(500, Math.max(1, Number.parseInt(value, 10) || 1)); }
+function setInputCount(value) { inputCount = normalizedCount(value); document.querySelector("#count-input").value = inputCount; }
+document.querySelector("#count-minus").onclick = () => setInputCount(inputCount - 5);
+document.querySelector("#count-plus").onclick = () => setInputCount(inputCount + 5);
+document.querySelector("#count-input").addEventListener("change", event => setInputCount(event.target.value));
+function setMotionStatus(message) { document.querySelector("#motion-status").textContent = message; }
+function currentMotionSeconds(state = motionState) { return !state ? 0 : (state.elapsedSeconds ?? 0) + (state.activeSince ? (Date.now() - state.activeSince) / 1000 : 0); }
+function startMotionTimer() { if (motionTimer) window.clearInterval(motionTimer); motionTimer = window.setInterval(updateMotionUi, 500); }
+function updateMotionUi() {
+  const state = motionState ?? { count: 0, phase: "idle", active: false };
+  const labels = { idle: ["Ⅰ", "開始前"], calibrating: ["Ⅰ", "直立姿勢を確認中"], ready: ["Ⅱ", "しゃがんでください"], down: ["Ⅲ", "しゃがみ姿勢 OK"], paused: ["Ⅱ", "計測を一時停止中"], done: ["✓", "計測を終了しました"] };
+  const [mark, label] = labels[state.phase] ?? labels.idle;
+  document.querySelector("#motion-count").textContent = state.count;
+  const elapsed = Math.floor(currentMotionSeconds(state));
+  document.querySelector("#motion-duration").textContent = formatDuration(elapsed);
+  document.querySelector("#motion-energy").innerHTML = `${activeEnergy(elapsed).toFixed(1)} <small>kcal</small>`;
+  document.querySelector("#motion-posture").dataset.phase = state.phase;
+  document.querySelector("#motion-posture-mark").textContent = mark;
+  document.querySelector("#motion-posture-label").textContent = label;
+  document.querySelector("#motion-begin-button").hidden = Boolean(state.started);
+  document.querySelector("#motion-begin-button").disabled = Boolean(state.started);
+  document.querySelector("#motion-finish-button").hidden = !state.started;
+  const undoButton = document.querySelector("#motion-undo-button");
+  undoButton.hidden = !state.started || state.count < 1;
+  undoButton.disabled = Boolean(state.penaltyConsumed);
+  undoButton.textContent = state.penaltyConsumed ? "Talk Coach同期分は取り消せません" : "↶ 直前の1回を取り消す";
+}
+function haptic(pattern) { if (typeof navigator.vibrate === "function") navigator.vibrate(pattern); }
+function isUpright(beta) { return Math.abs(Math.abs(beta) - 90) <= motionMode().uprightTolerance; }
+function isHorizontal(beta) { return Math.abs(beta) <= motionMode().horizontalTolerance; }
+async function consumeTalkCoachPenalty() {
+  if (!window.PenaltySync?.isConfigured()) return;
+  const currentPenalty = window.PenaltySync.getState();
+  if (currentPenalty.remaining <= 0) return;
+
+  try {
+    const result = await window.PenaltySync.completeOne();
+    if (result.committed && motionState) {
+      motionState.penaltyConsumed = (motionState.penaltyConsumed ?? 0) + 1;
+    }
+  } catch (error) {
+    console.warn("[SQUAT BAR] penalty sync failed", error);
+  }
+}
+
+function handleDeviceOrientation(event) {
+  if (!motionState?.active || !Number.isFinite(event.beta) || !Number.isFinite(event.gamma)) return;
+  if (motionState.phase === "calibrating") {
+    if (!isUpright(event.beta)) { motionState.samples = []; setMotionStatus("スマホ上部を下にして、太ももをまっすぐにしてください。"); return; }
+    motionState.samples.push(event.beta);
+    if (motionState.samples.length < 12) return;
+    motionState.phase = "ready"; setMotionStatus("準備完了。ゆっくりしゃがみ、スマホが水平になるまで下げてください。"); updateMotionUi();
+    return;
+  }
+  if (motionState.phase === "ready" && isHorizontal(event.beta)) {
+    motionState.phase = "down"; haptic(80); setMotionStatus("しゃがみ姿勢を検出しました。立ち上がって直立姿勢へ戻ってください。"); updateMotionUi(); return;
+  }
+  if (motionState.phase === "down" && isUpright(event.beta) && Date.now() - motionState.lastCountAt >= motionMode().minRepMs) {
+    motionState.phase = "ready"; motionState.lastCountAt = Date.now(); motionState.count += 1;
+    consumeTalkCoachPenalty();
+    inputCount = motionState.count; document.querySelector("#count-input").value = inputCount;
+    haptic([45, 60, 45]); updateMotionUi(); setMotionStatus(`${motionState.count}回。もう一度しゃがんでください。`);
+  }
+}
+function undoLastMotionCount() {
+  if (!motionState?.started || motionState.count < 1) return;
+  if (motionState.penaltyConsumed) return toast("Talk Coachと同期した回数は取り消せません。");
+  motionState.count -= 1; motionState.phase = "ready"; motionState.lastCountAt = Date.now();
+  inputCount = motionState.count || 1; document.querySelector("#count-input").value = inputCount;
+  haptic(35); updateMotionUi(); setMotionStatus("直前の1回を取り消しました。姿勢を整えて続けてください。");
+}
+function stopMotionCounter() {
+  if (motionState?.active) window.removeEventListener("deviceorientation", handleDeviceOrientation);
+  if (motionTimer) { window.clearInterval(motionTimer); motionTimer = null; }
+  if (motionState) motionState.active = false;
+}
+function pauseMotionCounter() {
+  if (!motionState?.active) return;
+  motionState.elapsedSeconds = currentMotionSeconds(); motionState.activeSince = null; motionState.phaseBeforePause = motionState.phase;
+  stopMotionCounter(); motionState.phase = "paused"; updateMotionUi();
+}
+function resumeMotionCounter() {
+  if (!motionState?.started || motionState.phase !== "paused") return;
+  motionState.active = true; motionState.activeSince = Date.now(); motionState.phase = motionState.phaseBeforePause ?? "ready";
+  window.addEventListener("deviceorientation", handleDeviceOrientation); startMotionTimer(); updateMotionUi();
+  setMotionStatus(motionState.phase === "calibrating" ? "直立姿勢を確認しています。太ももを動かさずにお待ちください…" : "計測を再開しました。しゃがんでください。");
+  document.querySelector("#motion-resume-dialog").close();
+}
+function interruptMotionCounter() {
+  stopMotionCounter(); motionState = null;
+  if (document.querySelector("#motion-resume-dialog").open) document.querySelector("#motion-resume-dialog").close();
+  if (document.querySelector("#motion-dialog").open) document.querySelector("#motion-dialog").close();
+}
+function openMotionCounter() {
+  motionOriginRecord = editingRecordId ? data.records.find(record => record.id === editingRecordId) : null;
+  document.querySelector("#record-dialog").close();
+  motionState = { active: false, started: false, phase: "idle", samples: [], count: 0, penaltyConsumed: 0, lastCountAt: 0, elapsedSeconds: 0 };
+  updateMotionUi(); setMotionStatus("スマホの背面を太ももへ。上部を下にして、直立した姿勢で準備してください。");
+  document.querySelector("#motion-dialog").showModal();
+}
+async function startMotionCounter() {
+  if (motionState?.started) return;
+  if (!("DeviceOrientationEvent" in window)) return setMotionStatus("この端末では傾きセンサーを利用できません。手入力をご利用ください。");
+  try {
+    if (typeof DeviceOrientationEvent.requestPermission === "function") {
+      const permission = await DeviceOrientationEvent.requestPermission();
+      if (permission !== "granted") return setMotionStatus("センサーの利用が許可されませんでした。Safariの設定をご確認ください。");
+    }
+    motionState = { active: true, started: true, phase: "calibrating", samples: [], count: 0, penaltyConsumed: 0, lastCountAt: 0, elapsedSeconds: 0, activeSince: Date.now() };
+    updateMotionUi(); setMotionStatus("直立姿勢を確認しています。太ももを動かさずにお待ちください…");
+    window.addEventListener("deviceorientation", handleDeviceOrientation);
+    startMotionTimer();
+  } catch { setMotionStatus("センサーを開始できませんでした。HTTPSのSafariからお試しください。"); }
+}
+function finishMotionCounter() {
+  const count = motionState?.count ?? 0;
+  const penaltyConsumed = motionState?.penaltyConsumed ?? 0;
+  const durationSeconds = Math.max(1, Math.floor(currentMotionSeconds()));
+  const result = { durationSeconds, activeEnergy: activeEnergy(durationSeconds) };
+  stopMotionCounter(); document.querySelector("#motion-dialog").close();
+  if (count) openRecordDialog(motionOriginRecord, count, result, penaltyConsumed ? "Talk Coach ペナルティ" : "");
+}
+document.querySelector("#motion-open-button").onclick = openMotionCounter;
+document.querySelector("#motion-begin-button").onclick = startMotionCounter;
+document.querySelector("#motion-finish-button").onclick = finishMotionCounter;
+document.querySelector("#motion-undo-button").onclick = undoLastMotionCount;
+document.querySelector("#motion-close-button").onclick = interruptMotionCounter;
+document.querySelector("#motion-dialog").addEventListener("close", stopMotionCounter);
+document.querySelector("#resume-motion-button").onclick = resumeMotionCounter;
+document.querySelector("#interrupt-motion-button").onclick = interruptMotionCounter;
+document.querySelector("#motion-resume-dialog").addEventListener("cancel", event => event.preventDefault());
+document.addEventListener("visibilitychange", () => {
+  if (document.hidden) pauseMotionCounter();
+  else if (motionState?.started && motionState.phase === "paused" && document.querySelector("#motion-dialog").open && !document.querySelector("#motion-resume-dialog").open) document.querySelector("#motion-resume-dialog").showModal();
+});
+document.querySelector("#record-form").addEventListener("submit", event => { event.preventDefault(); const unlockedBefore = unlockedStaffIds(); setInputCount(document.querySelector("#count-input").value); const before = todayTotal(); const createdAt = new Date(document.querySelector("#performed-at-input").value).getTime() || Date.now(); const memo = document.querySelector("#memo-input").value.trim(); const existing = data.records.find(record => record.id === editingRecordId); if (existing) { existing.count = inputCount; existing.memo = memo; existing.createdAt = createdAt; if (pendingMotionResult) Object.assign(existing, pendingMotionResult); } else { data.records.push({ id: crypto.randomUUID(), count: inputCount, memo, createdAt, ...(pendingMotionResult ?? {}) }); } const newlyUnlocked = [...unlockedStaffIds()].filter(id => !unlockedBefore.has(id)); saveData(); document.querySelector("#record-dialog").close(); document.querySelector("#memo-input").value = ""; const wasEditing = editingRecordId !== null; editingRecordId = null; pendingMotionResult = null; render(); const activeStaff = selectedStaff(); if (!wasEditing) toast(before < data.goal && todayTotal() >= data.goal ? `✦ ${staffName(activeStaff)}「${dialogueFor(activeStaff, data.goal, data.goal)}」` : `${staffName(activeStaff)}「${recordReactionFor(activeStaff, inputCount)}」`); showUnlockDialog(newlyUnlocked); });
+document.querySelector("#goal-minus").onclick = () => { data.goal = Math.max(5, data.goal - 5); saveData(); render(); };
+document.querySelector("#goal-plus").onclick = () => { data.goal = Math.min(500, data.goal + 5); saveData(); render(); };
+document.querySelector("#goal-input").addEventListener("change", event => { data.goal = Math.min(500, Math.max(5, Number.parseInt(event.target.value, 10) || 5)); saveData(); render(); });
+document.querySelector("#weight-input").addEventListener("change", event => { data.weightKg = Math.min(300, Math.max(20, Number.parseFloat(event.target.value) || 20)); saveData(); render(); });
+document.querySelector("#motion-mode-input").addEventListener("change", event => { data.motionMode = MOTION_MODES[event.target.value] ? event.target.value : "standard"; saveData(); render(); toast(`計測感度を「${motionMode().label}」に変更しました。`); });
+document.querySelector("#export-data-button").onclick = async () => {
+  const file = new File([JSON.stringify(backupPayload(), null, 2)], backupFileName(), { type: "application/json" });
+  try {
+    if (navigator.canShare?.({ files: [file] })) { await navigator.share({ files: [file], title: "SQUAT BARのバックアップ" }); toast("共有先を選んでバックアップを保存してください。"); return; }
+    const link = document.createElement("a"); link.href = URL.createObjectURL(file); link.download = file.name; link.click(); URL.revokeObjectURL(link.href); toast("バックアップを保存しました。");
+  } catch (error) { if (error.name !== "AbortError") toast("バックアップを書き出せませんでした。"); }
+};
+document.querySelector("#import-data-input").addEventListener("change", async event => {
+  const file = event.target.files?.[0]; event.target.value = "";
+  if (!file) return;
+  try {
+    const payload = JSON.parse(await file.text());
+    const restored = normalizeImportedData(payload.data ?? payload);
+    if (!window.confirm("現在のデータをバックアップの内容で置き換えます。よろしいですか？")) return;
+    data = restored; saveData(); render(); toast("バックアップを読み込みました。");
+  } catch { toast("読み込めないバックアップファイルです。"); }
+});
+document.querySelector("#add-reminder-button").onclick = async () => { const reminder = { title: "SQUAT BAR", text: "スクワットを記録する", url: location.href }; if (!navigator.share) return toast("iPhoneのSafariから開くとリマインダーへ追加できます。"); try { await navigator.share(reminder); } catch (error) { if (error.name !== "AbortError") toast("共有メニューを開けませんでした。"); } };
+document.querySelector("#penalty-setup-save").onclick = () => {
+  try {
+    window.PenaltySync.importSetup(document.querySelector("#penalty-setup-input").value);
+    toast("Talk Coachの連携設定を保存しました。");
+    window.setTimeout(() => location.reload(), 450);
+  } catch (error) {
+    document.querySelector("#penalty-setup-status").textContent = error.message || "連携設定を読み込めませんでした。";
+  }
+};
+document.querySelector("#penalty-setup-clear").onclick = () => {
+  if (!window.confirm("Talk Coachとの連携設定を解除しますか？")) return;
+  window.PenaltySync.clearSetup();
+  toast("Talk Coach連携を解除しました。");
+  window.setTimeout(() => location.reload(), 350);
+};
+
+if (window.PenaltySync) {
+  window.PenaltySync.onStatus(({ status, message }) => {
+    penaltySyncStatus = status;
+    const statusEl = document.querySelector("#penalty-setup-status");
+    if (statusEl && message) statusEl.textContent = message;
+    renderPenaltyUi();
+  });
+
+  window.PenaltySync.onChange(state => {
+    penaltyState = state;
+    renderPenaltyUi();
+
+    if (previousPenaltyRemaining !== null && previousPenaltyRemaining > 0 && state.remaining === 0 && state.target > 0) {
+      haptic([80, 70, 80, 70, 140]);
+      toast("✦ Talk Coach ペナルティ完了");
+    }
+    previousPenaltyRemaining = state.remaining;
+  });
+}
+
+document.querySelector("#show-fullbody-button").onclick = () => document.querySelector("#staff-dialog").showModal();
+document.querySelector("#close-staff-dialog").onclick = () => document.querySelector("#staff-dialog").close();
+document.querySelector("#close-unlock-dialog").onclick = () => document.querySelector("#unlock-dialog").close();
+document.querySelector("#unlock-dialog").addEventListener("cancel", event => event.preventDefault());
+if ("serviceWorker" in navigator) navigator.serviceWorker.register("service-worker.js");
+render();
