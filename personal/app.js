@@ -1,4 +1,5 @@
 const STORAGE_KEY = "squat-maid-data-v1";
+const AUTO_BACKUP_KEY = `${STORAGE_KEY}-auto-recovery-v1`;
 const SQUAT_MET = 5;
 const BACKUP_VERSION = 2;
 const MAIDS = [
@@ -30,8 +31,27 @@ let penaltyState = { target: 0, completed: 0, remaining: 0, status: "idle" };
 let penaltySyncStatus = "unconfigured";
 let previousPenaltyRemaining = null;
 
-function loadData() { try { return { goal: 30, maidName: "ルナ", staffNames: {}, selectedStaffId: "luna", weightKg: 60, motionMode: "standard", records: [], ...JSON.parse(localStorage.getItem(STORAGE_KEY)) }; } catch { return { goal: 30, maidName: "ルナ", staffNames: {}, selectedStaffId: "luna", weightKg: 60, motionMode: "standard", records: [] }; } }
-function saveData() { localStorage.setItem(STORAGE_KEY, JSON.stringify(data)); }
+function defaultData() { return { goal: 30, maidName: "ルナ", staffNames: {}, selectedStaffId: "luna", weightKg: 60, motionMode: "standard", records: [] }; }
+function readSavedValue(key) { try { const value = JSON.parse(localStorage.getItem(key)); return value && typeof value === "object" ? value : null; } catch { return null; } }
+function savedData(value) { return value && typeof value === "object" && Array.isArray(value.records) ? value : null; }
+function loadData() {
+  const defaults = defaultData();
+  const primary = savedData(readSavedValue(STORAGE_KEY));
+  if (primary) return { ...defaults, ...primary };
+  const recovery = readSavedValue(AUTO_BACKUP_KEY);
+  const recovered = savedData(recovery?.data);
+  return recovered ? { ...defaults, ...recovered } : defaults;
+}
+function saveData() {
+  const savedAt = new Date().toISOString();
+  localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
+  try { localStorage.setItem(AUTO_BACKUP_KEY, JSON.stringify({ version: BACKUP_VERSION, savedAt, data })); } catch { /* The primary record remains saved even if the recovery copy cannot be updated. */ }
+}
+function autoBackupStatus() {
+  const savedAt = readSavedValue(AUTO_BACKUP_KEY)?.savedAt;
+  if (!savedAt || Number.isNaN(new Date(savedAt).getTime())) return "記録の変更時に、この端末へ自動復元ポイントを保存します。";
+  return `最終自動保存: ${new Date(savedAt).toLocaleString("ja-JP", { month: "numeric", day: "numeric", hour: "2-digit", minute: "2-digit" })}`;
+}
 function backupFileName() { return `squat-bar-backup-${new Date().toISOString().slice(0, 10)}.json`; }
 function backupPayload() { return { version: BACKUP_VERSION, exportedAt: new Date().toISOString(), app: "SQUAT BAR", data }; }
 function normalizeImportedData(candidate) {
@@ -140,6 +160,7 @@ function render() {
   document.querySelector("#collection-total").textContent = all;
   document.querySelector("#goal-input").value = data.goal;
   document.querySelector("#weight-input").value = data.weightKg;
+  document.querySelector("#auto-backup-status").textContent = autoBackupStatus();
   document.querySelector("#motion-mode-input").value = MOTION_MODES[data.motionMode] ? data.motionMode : "standard";
   document.querySelector("#motion-mode-hint").textContent = motionMode().description;
   document.querySelector("#home-staff-image").src = activeStaff.image;
@@ -441,4 +462,5 @@ document.querySelector("#close-staff-dialog").onclick = () => document.querySele
 document.querySelector("#close-unlock-dialog").onclick = () => document.querySelector("#unlock-dialog").close();
 document.querySelector("#unlock-dialog").addEventListener("cancel", event => event.preventDefault());
 if ("serviceWorker" in navigator) navigator.serviceWorker.register("service-worker.js");
+saveData();
 render();
