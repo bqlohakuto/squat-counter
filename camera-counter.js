@@ -11,11 +11,28 @@
     if (faceLandmarker) return faceLandmarker;
     const { FaceLandmarker, FilesetResolver } = await import(`https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@${TASKS_VERSION}`);
     taskApi = await FilesetResolver.forVisionTasks(WASM_ROOT);
-    faceLandmarker = await FaceLandmarker.createFromOptions(taskApi, {
-      baseOptions: { modelAssetPath: MODEL_URL, delegate: "GPU" }, runningMode: "VIDEO", numFaces: 1,
+    const options = delegate => ({
+      baseOptions: { modelAssetPath: MODEL_URL, delegate }, runningMode: "VIDEO", numFaces: 1,
       minFaceDetectionConfidence: 0.55, minFacePresenceConfidence: 0.55, minTrackingConfidence: 0.55
     });
+    try { faceLandmarker = await FaceLandmarker.createFromOptions(taskApi, options("GPU")); }
+    catch (gpuError) { console.warn("GPU face detection unavailable; retrying on CPU.", gpuError); faceLandmarker = await FaceLandmarker.createFromOptions(taskApi, options("CPU")); }
     return faceLandmarker;
+  }
+  async function requestCamera() {
+    const preferred = { video: { facingMode: "user", width: { ideal: 720 }, height: { ideal: 960 } }, audio: false };
+    try { return await navigator.mediaDevices.getUserMedia(preferred); }
+    catch (error) {
+      if (error?.name === "NotAllowedError") throw error;
+      return navigator.mediaDevices.getUserMedia({ video: true, audio: false });
+    }
+  }
+  function cameraErrorMessage(error, modelError = false) {
+    if (modelError) return "頭の検出の準備に失敗しました。通信を確認して、もう一度お試しください。";
+    if (error?.name === "NotAllowedError") return "カメラの使用を許可してください。iPhoneの設定からSafari（またはSQUAT BAR）のカメラを許可します。";
+    if (error?.name === "NotFoundError") return "利用できるカメラが見つかりません。";
+    if (error?.name === "NotReadableError") return "カメラをほかのアプリが使用中です。カメラアプリなどを閉じてください。";
+    return "カメラを開始できませんでした。アプリを閉じて開き直し、もう一度お試しください。";
   }
   function updateFeedback() {
     const movement = Math.max(0, state.movement || 0);
@@ -32,8 +49,8 @@
       idle: "カメラを開始してください", calibrating: "直立姿勢を確認中…", down: "しゃがみを検出。立ち上がってください", lost: "頭をガイド内へ戻してください"
     };
     const liveLabel = state.phase === "upright" ? (progress >= 66 ? "もう少しでしゃがみ判定" : progress >= 28 ? "下げています" : "立ち姿勢を確認") : labels[state.phase] ?? labels.idle;
-    el("camera-feedback-state").textContent = liveLabel;
-    el("camera-feedback").dataset.phase = state.phase;
+    if (feedbackState) feedbackState.textContent = liveLabel;
+    if (feedback) feedback.dataset.phase = state.phase;
   }
   function updateUi(message = "") {
     el("camera-count").textContent = state.count;
@@ -85,16 +102,18 @@
     animationFrame = requestAnimationFrame(detectFrame);
   }
   async function start() {
-    if (!navigator.mediaDevices?.getUserMedia) { updateUi("このブラウザではカメラを利用できません。Safariで開いてください。"); return; }
-    try {
-      updateUi("カメラと頭の検出モデルを準備しています…");
-      const stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: "user", width: { ideal: 720 }, height: { ideal: 960 } }, audio: false });
-      const video = el("camera-video"); video.srcObject = stream; await video.play(); await ensureLandmarker();
-      state = { ...state, running: true, count: 0, phase: "calibrating", samples: [], startedAt: now(), baseline: 0, movement: 0, lastCountAt: 0, stream };
-      updateUi("スマホを机に固定し、まっすぐ立って頭をガイド内で止めてください。"); animationFrame = requestAnimationFrame(detectFrame);
-    } catch (error) {
-      stopCamera(); updateUi(error?.name === "NotAllowedError" ? "カメラの許可が必要です。Safariの許可設定を確認してください。" : "カメラを開始できませんでした。通信と権限を確認してください。");
-    }
+    if (!window.isSecureContext || !navigator.mediaDevices?.getUserMedia) { updateUi("このブラウザではカメラを利用できません。HTTPSのSafariで開いてください。"); return; }
+    updateUi("カメラを起動しています…");
+    let stream;
+    try { stream = await requestCamera(); }
+    catch (error) { console.error("Camera permission/start failed.", error); stopCamera(); updateUi(cameraErrorMessage(error)); return; }
+    const video = el("camera-video");
+    try { video.srcObject = stream; await video.play(); }
+    catch (error) { stream.getTracks().forEach(track => track.stop()); stopCamera(); updateUi(cameraErrorMessage(error)); return; }
+    try { updateUi("頭の検出を準備しています…"); await ensureLandmarker(); }
+    catch (error) { console.error("Face detection model failed.", error); stream.getTracks().forEach(track => track.stop()); stopCamera(); updateUi(cameraErrorMessage(error, true)); return; }
+    state = { ...state, running: true, count: 0, phase: "calibrating", samples: [], startedAt: now(), baseline: 0, movement: 0, lastCountAt: 0, stream };
+    updateUi("スマホを机に固定し、まっすぐ立って頭をガイド内で止めてください。"); animationFrame = requestAnimationFrame(detectFrame);
   }
   function finish() {
     const result = { count: state.count, durationSeconds: Math.max(1, Math.floor((now() - state.startedAt) / 1000)) };
