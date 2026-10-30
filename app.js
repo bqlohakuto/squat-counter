@@ -3,9 +3,9 @@ const AUTO_BACKUP_KEY = `${STORAGE_KEY}-auto-recovery-v1`;
 const SQUAT_MET = 5;
 const BACKUP_VERSION = 4;
 const MAIDS = [
-  { id: "luna", name: "ルナ", role: "カウンター担当", threshold: 0, image: "a_clean_cutout_transparent_background_illustration.png", squatImage: "staff-luna-squat-v1.png" },
-  { id: "mirei", name: "ミレイ", role: "もうひとりのスタッフ", threshold: 1000, image: "staff-2.png", squatImage: "staff-mirei-squat-v1.png" },
-  { id: "manager", name: "店長", role: "SQUAT BAR 店長", image: "staff-manager.png", squatImage: "staff-manager-squat-v1.png", unlock: "high-streak" }
+  { id: "luna", name: "ルナ", role: "カウンター担当", threshold: 0, image: "a_clean_cutout_transparent_background_illustration.png", squatStep1Image: "staff-luna-squat-step1-v2.png", squatStep2Image: "staff-luna-squat-step2-v2.png", squatImage: "staff-luna-squat-v1.png" },
+  { id: "mirei", name: "ミレイ", role: "もうひとりのスタッフ", threshold: 1000, image: "staff-2.png", squatStep1Image: "staff-mirei-squat-step1-v2.png", squatStep2Image: "staff-mirei-squat-step2-v2.png", squatImage: "staff-mirei-squat-v1.png" },
+  { id: "manager", name: "店長", role: "SQUAT BAR 店長", image: "staff-manager.png", squatStep1Image: "staff-manager-squat-step1-v2.png", squatStep2Image: "staff-manager-squat-step2-v2.png", squatImage: "staff-manager-squat-v1.png", unlock: "high-streak" }
 ];
 const REWARDS = [
   { name: "お祝いのリボン", role: "累計100回で解放", icon: "🎀", threshold: 100 },
@@ -187,7 +187,7 @@ function render() {
   document.querySelector("#home-staff-image").src = activeStaff.image;
   document.querySelector("#home-staff-image").alt = `${staffName(activeStaff)}がバーカウンターに立つ`;
   document.querySelector("#home-staff-squat-image").src = activeStaff.squatImage;
-  document.querySelector(".character-portrait").classList.toggle("staff-squatting", Boolean(activeCompanion()));
+  document.querySelector(".character-portrait").classList.remove("staff-squatting");
   document.querySelector("#maid-name").textContent = staffName(activeStaff);
   document.querySelector("#staff-dialog-image").src = activeStaff.image;
   document.querySelector("#staff-dialog-image").alt = `${staffName(activeStaff)}の全身イラスト`;
@@ -377,7 +377,7 @@ function interruptMotionCounter() {
 }
 function openCameraCounter() {
   if (!window.CameraCounter) return toast("カメラ計測の準備中です。少し待ってからもう一度お試しください。");
-  const staff = selectedStaff(); document.querySelector("#record-dialog").close();
+  const staff = activeCompanion() ?? selectedStaff(); document.querySelector("#record-dialog").close();
   window.CameraCounter.open({ staff: { ...staff, name: staffName(staff) }, onFinish: result => openRecordDialog(null, result.count, { durationSeconds: result.durationSeconds, activeEnergy: activeEnergy(result.durationSeconds) }, "カメラ計測") });
 }
 function openMotionCounter() {
