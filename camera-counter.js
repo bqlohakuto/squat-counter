@@ -1,7 +1,8 @@
 (() => {
   const TASKS_VERSION = "1.2.0";
+  const TASKS_BUNDLE_URL = `https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@${TASKS_VERSION}/vision_bundle.mjs`;
   const WASM_ROOT = `https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@${TASKS_VERSION}/wasm`;
-  const MODEL_URL = "https://storage.googleapis.com/mediapipe-models/face_landmarker/face_landmarker/float16/1/face_landmarker.task";
+  const MODEL_URL = new URL("face_landmarker.task", new URL("./", document.currentScript?.src || location.href)).href;
   let faceLandmarker = null, taskApi = null, animationFrame = null;
   let state = { running: false, count: 0, phase: "idle", samples: [], startedAt: 0, baseline: 0, movement: 0, lastCountAt: 0, stream: null, onFinish: null };
   const el = id => document.querySelector(`#${id}`);
@@ -9,7 +10,7 @@
 
   async function ensureLandmarker() {
     if (faceLandmarker) return faceLandmarker;
-    const { FaceLandmarker, FilesetResolver } = await import(`https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@${TASKS_VERSION}`);
+    const { FaceLandmarker, FilesetResolver } = await import(TASKS_BUNDLE_URL);
     taskApi = await FilesetResolver.forVisionTasks(WASM_ROOT);
     const options = delegate => ({
       baseOptions: { modelAssetPath: MODEL_URL, delegate }, runningMode: "VIDEO", numFaces: 1,
@@ -93,7 +94,7 @@
     const video = el("camera-video");
     try {
       if (video.readyState >= HTMLMediaElement.HAVE_CURRENT_DATA && faceLandmarker) {
-        const result = faceLandmarker.detectForVideo(video, timestamp);
+        const result = faceLandmarker.detectForVideo(video);
         const head = result.faceLandmarks?.[0]?.[10];
         if (head) processHeadPosition(head.y, timestamp);
         else if (state.phase !== "calibrating") { state.phase = "lost"; state.movement = 0; updateUi("頭と肩がカメラに入る位置へ戻ってください。"); }
