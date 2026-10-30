@@ -161,11 +161,10 @@
     </dialog>
     <dialog id="camera-dialog" class="camera-dialog">
       <button id="camera-close-button" class="close-button" aria-label="カメラ計測を閉じる">×</button>
-      <p class="motion-dialog-kicker">HEAD POSITION COUNTER</p><h2>机に置いて一緒にスクワット</h2>
+      <p class="motion-dialog-kicker">HEAD POSITION COUNTER</p><h2>机に置いて一緒にスクワット</h2><div class="camera-start-actions"><button id="camera-start-button" class="primary-button" type="button">カメラを開始</button><button id="camera-finish-button" class="secondary-button" type="button" hidden>終了して記録へ</button></div>
       <div class="camera-stage"><video id="camera-video" autoplay muted playsinline></video><div class="camera-guide"><i></i><span id="camera-guide-label">机に置き、頭と肩を映してください</span></div><div id="camera-feedback" class="camera-feedback" data-phase="idle"><strong id="camera-feedback-count">0回</strong><span id="camera-feedback-state">カメラを開始してください</span><i><b id="camera-depth-fill"></b></i></div><div class="camera-staff-stage"><img id="camera-staff-image" src="../a_clean_cutout_transparent_background_illustration.png" alt="一緒にスクワットするスタッフ" /><img id="camera-staff-step1-image" class="motion-frame" src="../staff-luna-squat-step1-v2.png" alt="" aria-hidden="true" /><img id="camera-staff-step2-image" class="motion-frame" src="../staff-luna-squat-step2-v2.png" alt="" aria-hidden="true" /><img id="camera-staff-squat-image" class="squat-frame" src="../staff-luna-squat-v1.png" alt="" aria-hidden="true" /></div></div>
       <div class="camera-live"><article><span>現在の回数</span><strong id="camera-count">0</strong><small>回</small></article><article><span>姿勢</span><strong id="camera-phase">準備中</strong><small id="camera-status">カメラを開始してください</small></article></div>
       <p class="camera-note">スマホを机などに固定して使います。映像は端末内で頭の上下動を検出するためだけに使い、保存・送信しません。振動は行いません。</p>
-      <button id="camera-start-button" class="primary-button" type="button">カメラを開始</button><button id="camera-finish-button" class="secondary-button" type="button" hidden>終了して記録へ</button>
     </dialog>
     <dialog id="motion-resume-dialog" class="motion-resume-dialog">
       <p class="motion-dialog-kicker">MEASUREMENT PAUSED</p><h2>計測を再開しますか？</h2>

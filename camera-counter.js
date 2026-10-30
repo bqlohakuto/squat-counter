@@ -25,8 +25,9 @@
     stage?.classList.toggle("is-step1", movingDown && movement >= 0.018 && movement < 0.043);
     stage?.classList.toggle("is-step2", movingDown && movement >= 0.043);
     stage?.classList.toggle("is-squatting", state.phase === "down");
-    el("camera-feedback-count").textContent = `${state.count}回`;
-    el("camera-depth-fill").style.width = `${progress}%`;
+    const feedbackCount = el("camera-feedback-count"), feedbackState = el("camera-feedback-state"), feedback = el("camera-feedback"), depthFill = el("camera-depth-fill");
+    if (feedbackCount) feedbackCount.textContent = `${state.count}回`;
+    if (depthFill) depthFill.style.width = `${progress}%`;
     const labels = {
       idle: "カメラを開始してください", calibrating: "直立姿勢を確認中…", down: "しゃがみを検出。立ち上がってください", lost: "頭をガイド内へ戻してください"
     };
