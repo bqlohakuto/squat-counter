@@ -103,11 +103,16 @@
   }
   function open({ staff, onFinish }) {
     stopCamera(); state = { running: false, count: 0, phase: "idle", samples: [], startedAt: 0, baseline: 0, movement: 0, lastCountAt: 0, stream: null, onFinish };
-    el("camera-staff-image").src = staff.image; el("camera-staff-image").alt = `${staff.name}が一緒にスクワットしています`;
-    el("camera-staff-step1-image").src = staff.squatStep1Image || staff.image;
-    el("camera-staff-step2-image").src = staff.squatStep2Image || staff.squatImage || staff.image;
-    el("camera-staff-squat-image").src = staff.squatImage || staff.image;
-    updateUi("スマホを机に置き、頭と肩をガイド内へ入れてください。"); el("camera-dialog").showModal();
+    const setImage = (id, source) => { const image = el(id); if (image) image.src = source; };
+    const mainImage = el("camera-staff-image");
+    if (mainImage) { mainImage.src = staff.image; mainImage.alt = `${staff.name}が一緒にスクワットしています`; }
+    setImage("camera-staff-step1-image", staff.squatStep1Image || staff.image);
+    setImage("camera-staff-step2-image", staff.squatStep2Image || staff.squatImage || staff.image);
+    setImage("camera-staff-squat-image", staff.squatImage || staff.image);
+    const dialog = el("camera-dialog");
+    if (!dialog) throw new Error("camera dialog is unavailable");
+    if (!dialog.open) dialog.showModal();
+    updateUi("スマホを机に置き、頭と肩をガイド内へ入れてください。");
   }
   function init() {
     el("camera-start-button").onclick = start;

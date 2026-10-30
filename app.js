@@ -378,7 +378,7 @@ function interruptMotionCounter() {
 function openCameraCounter() {
   if (!window.CameraCounter) return toast("カメラ計測の準備中です。少し待ってからもう一度お試しください。");
   const staff = activeCompanion() ?? selectedStaff(); document.querySelector("#record-dialog").close();
-  window.CameraCounter.open({ staff: { ...staff, name: staffName(staff) }, onFinish: result => openRecordDialog(null, result.count, { durationSeconds: result.durationSeconds, activeEnergy: activeEnergy(result.durationSeconds) }, "カメラ計測") });
+  try { window.CameraCounter.open({ staff: { ...staff, name: staffName(staff) }, onFinish: result => openRecordDialog(null, result.count, { durationSeconds: result.durationSeconds, activeEnergy: activeEnergy(result.durationSeconds) }, "カメラ計測") }); } catch (error) { toast("計測画面を開けませんでした。アプリを再読み込みして、もう一度お試しください。"); }
 }
 function openMotionCounter() {
   motionOriginRecord = editingRecordId ? data.records.find(record => record.id === editingRecordId) : null;
