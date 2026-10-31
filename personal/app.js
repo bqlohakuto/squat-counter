@@ -3,9 +3,9 @@ const AUTO_BACKUP_KEY = `${STORAGE_KEY}-auto-recovery-v1`;
 const SQUAT_MET = 5;
 const BACKUP_VERSION = 4;
 const MAIDS = [
-  { id: "luna", name: "ルナ", role: "カウンター担当", threshold: 0, image: "../a_clean_cutout_transparent_background_illustration.png", squatStep1Image: "../staff-luna-squat-step1-v2.png", squatStep2Image: "../staff-luna-squat-step2-v2.png", squatImage: "../staff-luna-squat-v1.png" },
-  { id: "mirei", name: "ミレイ", role: "もうひとりのスタッフ", threshold: 1000, image: "../staff-2.png", squatStep1Image: "../staff-mirei-squat-step1-v2.png", squatStep2Image: "../staff-mirei-squat-step2-v2.png", squatImage: "../staff-mirei-squat-v1.png" },
-  { id: "manager", name: "店長", role: "SQUAT BAR 店長", image: "../staff-manager.png", squatStep1Image: "../staff-manager-squat-step1-v2.png", squatStep2Image: "../staff-manager-squat-step2-v2.png", squatImage: "../staff-manager-squat-v1.png", unlock: "high-streak" }
+  { id: "luna", name: "ルナ", role: "カウンター担当", threshold: 0, image: "../a_clean_cutout_transparent_background_illustration.png" },
+  { id: "mirei", name: "ミレイ", role: "もうひとりのスタッフ", threshold: 1000, image: "../staff-2.png" },
+  { id: "manager", name: "店長", role: "SQUAT BAR 店長", image: "../staff-manager.png", unlock: "high-streak" }
 ];
 const REWARDS = [
   { name: "お祝いのリボン", role: "累計100回で解放", icon: "🎀", threshold: 100 },
@@ -213,8 +213,6 @@ function render() {
   document.querySelector("#motion-mode-hint").textContent = motionMode().description;
   document.querySelector("#home-staff-image").src = activeStaff.image;
   document.querySelector("#home-staff-image").alt = `${staffName(activeStaff)}がバーカウンターに立つ`;
-  document.querySelector("#home-staff-squat-image").src = activeStaff.squatImage;
-  document.querySelector(".character-portrait").classList.remove("staff-squatting");
   document.querySelector("#maid-name").textContent = staffName(activeStaff);
   document.querySelector("#staff-dialog-image").src = activeStaff.image;
   document.querySelector("#staff-dialog-image").alt = `${staffName(activeStaff)}の全身イラスト`;
@@ -419,11 +417,6 @@ function interruptMotionCounter() {
   if (document.querySelector("#motion-resume-dialog").open) document.querySelector("#motion-resume-dialog").close();
   if (document.querySelector("#motion-dialog").open) document.querySelector("#motion-dialog").close();
 }
-function openCameraCounter() {
-  if (!window.CameraCounter) return toast("カメラ計測の準備中です。少し待ってからもう一度お試しください。");
-  const staff = activeCompanion() ?? selectedStaff(); document.querySelector("#record-dialog").close();
-  try { window.CameraCounter.open({ staff: { ...staff, name: staffName(staff) }, onFinish: result => openRecordDialog(null, result.count, { durationSeconds: result.durationSeconds, activeEnergy: activeEnergy(result.durationSeconds) }, "カメラ計測") }); } catch (error) { toast("計測画面を開けませんでした。アプリを再読み込みして、もう一度お試しください。"); }
-}
 function openMotionCounter() {
   motionOriginRecord = editingRecordId ? data.records.find(record => record.id === editingRecordId) : null;
   document.querySelector("#record-dialog").close();
@@ -454,7 +447,6 @@ function finishMotionCounter() {
   if (count) openRecordDialog(motionOriginRecord, count, result, penaltyConsumed ? "Talk Coach ペナルティ" : "");
 }
 document.querySelector("#motion-open-button").onclick = openMotionCounter;
-document.querySelector("#camera-open-button").onclick = openCameraCounter;
 document.querySelector("#motion-begin-button").onclick = startMotionCounter;
 document.querySelector("#motion-finish-button").onclick = finishMotionCounter;
 document.querySelector("#motion-undo-button").onclick = undoLastMotionCount;
