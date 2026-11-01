@@ -104,13 +104,7 @@ function startCompanionSession() {
   const staff = selectedStaff(); if (activeCompanion()) return toast("乾杯セッションが進行中です。次の記録を完了してください。");
   if (coinBalance() < 50) return toast(`あと ${50 - coinBalance()} coin 必要です。`);
   data.coinSpent = Math.max(0, Number(data.coinSpent) || 0) + 50; data.companion = { staffId: staff.id, startedAt: Date.now() }; saveData(); render();
-  toast(`🥂 ${staffName(staff)}へ${drinkForStaff(staff)}を振る舞いました。次は一緒にスクワット！`);
-}
-function renderCompanionSession() {
-  const card = document.querySelector("#companion-session"), staff = activeCompanion(); card.hidden = !staff;
-  if (!staff) return;
-  document.querySelector("#companion-session-title").textContent = `${staffName(staff)}と一緒にスクワット`;
-  document.querySelector("#companion-session-copy").textContent = `${drinkForStaff(staff)}で乾杯済み。次の記録を一緒に完了しましょう。`;
+  toast(`🥂 ${staffName(staff)}へ${drinkForStaff(staff)}を振る舞いました。次の記録を応援します。`);
 }
 function renderCompanionShop() {
   const root = document.querySelector("#companion-shop"), staff = selectedStaff(), companion = activeCompanion(), balance = coinBalance(); root.innerHTML = "";
@@ -189,7 +183,7 @@ function render() {
   document.querySelector("#maid-name").textContent = staffName(activeStaff);
   document.querySelector("#staff-dialog-image").src = activeStaff.image;
   document.querySelector("#staff-dialog-image").alt = `${staffName(activeStaff)}の全身イラスト`;
-  renderBarDecor(); renderCompanionSession(); renderHistory(); renderCollection(all);
+  renderBarDecor(); renderHistory(); renderCollection(all);
 }
 function renderHistory() {
   const list = document.querySelector("#history-list"), empty = document.querySelector("#history-empty");
@@ -295,7 +289,6 @@ function openRecordDialog(record = null, presetCount = null, motionResult = null
   document.querySelector("#record-dialog").showModal();
 }
 document.querySelector("#add-record-button").onclick = () => openRecordDialog();
-document.querySelector("#companion-record-button").onclick = () => { if (activeCompanion()) openRecordDialog(); };
 document.querySelector("#share-button").onclick = () => { const message = `今日はスクワットを${todayTotal()}回やった。\n#SQUATBAR #スクワット`; window.open(`https://x.com/intent/post?text=${encodeURIComponent(message)}`, "_blank", "noopener,noreferrer"); };
 function normalizedCount(value) { return Math.min(500, Math.max(1, Number.parseInt(value, 10) || 1)); }
 function setInputCount(value) { inputCount = normalizedCount(value); document.querySelector("#count-input").value = inputCount; }
