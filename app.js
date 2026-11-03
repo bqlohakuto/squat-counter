@@ -14,10 +14,10 @@ const REWARDS = [
   { name: "中庭の背景", role: "累計1,000回で解放", icon: "🌳", threshold: 1000 }
 ];
 const BAR_SHOP = [
-  { id: "plant", name: "カウンターグリーン", detail: "カウンター右側に鉢植えを置きます。", icon: "🌿", cost: 0 },
-  { id: "lamp", name: "アンバーランプ", detail: "柔らかな灯りをカウンター左に加えます。", icon: "💡", cost: 150 },
-  { id: "bottles", name: "ボトルディスプレイ", detail: "バックバーにきらめくボトルを増やします。", icon: "🍸", cost: 350 },
-  { id: "runner", name: "ベルベットランナー", detail: "カウンターに深紅のアクセントを敷きます。", icon: "♦", cost: 700 },
+  { id: "plant", name: "カウンターグリーン", detail: "カウンター右側に鉢植えを置きます。", icon: "🌿", image: "bar-plant-v1.png", cost: 0 },
+  { id: "lamp", name: "アンバーランプ", detail: "柔らかな灯りをカウンター左に加えます。", icon: "💡", image: "bar-amber-lamp-v2.png", cost: 150 },
+  { id: "bottles", name: "ボトルディスプレイ", detail: "バックバーにきらめくボトルを増やします。", icon: "🍸", image: "bar-bottle-display-v2.png", cost: 350 },
+  { id: "runner", name: "ベルベットランナー", detail: "カウンターに深紅のアクセントを敷きます。", icon: "♦", image: "bar-velvet-runner-v2.png", cost: 700 },
   { id: "record", name: "ミッドナイトレコード", detail: "ウォルナットのレコードプレーヤーをバックバーに置きます。", icon: "🎶", image: "bar-record-player.png", cost: 800 },
   { id: "stained-lamp", name: "ステンドグラスランプ", detail: "琥珀と深紅の灯りをバックバーに加えます。", icon: "🛋", image: "bar-stained-glass-lamp.png", cost: 1200 },
   { id: "flowers", name: "ナイトブルーム", detail: "ドライフラワーをカウンターに飾ります。", icon: "💐", image: "bar-dry-flower-vase.png", cost: 1800 }

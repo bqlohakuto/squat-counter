@@ -95,3 +95,9 @@ dialog { background:#302421; color:#f5e9da; }.close-button { color:#e7d7c6; }.to
 .bar-upgrade-stained-lamp { filter:drop-shadow(0 0 8px #e9a94b88); right:5px; top:12px; width:52px; z-index:4; }
 .bar-upgrade-flowers { bottom:42px; filter:drop-shadow(0 5px 4px #120907a8); left:7px; width:52px; z-index:6; }
 @media (max-height:700px) { .bar-upgrade-record { left:5px; top:34px; width:62px; }.bar-upgrade-stained-lamp { right:4px; top:10px; width:43px; }.bar-upgrade-flowers { bottom:39px; left:5px; width:43px; } }
+
+/* Generated replacements for the original shop decor */
+.bar-upgrade-lamp { background:none; border-radius:0; box-shadow:none; filter:drop-shadow(0 0 7px #e6ad5888); height:auto; left:18px; top:29px; width:47px; }
+.bar-upgrade-bottles { background:none; border:0; box-shadow:none; height:auto; left:9px; opacity:1; top:26px; width:78px; }
+.bar-upgrade-runner { background:none; border:0; bottom:32px; box-shadow:none; height:auto; left:50%; transform:translateX(-50%); width:128px; }
+@media (max-height:700px) { .bar-upgrade-lamp { left:14px; top:24px; transform:none; width:39px; }.bar-upgrade-bottles { left:7px; top:21px; transform:none; width:64px; }.bar-upgrade-runner { bottom:31px; transform:translateX(-50%); width:106px; } }
