@@ -5,7 +5,8 @@ const BACKUP_VERSION = 4;
 const MAIDS = [
   { id: "luna", name: "ルナ", role: "カウンター担当", threshold: 0, image: "../a_clean_cutout_transparent_background_illustration.png" },
   { id: "mirei", name: "ミレイ", role: "もうひとりのスタッフ", threshold: 1000, image: "../staff-2.png" },
-  { id: "manager", name: "店長", role: "SQUAT BAR 店長", image: "../staff-manager.png", unlock: "high-streak" }
+  { id: "manager", name: "店長", role: "SQUAT BAR 店長", image: "../staff-manager.png", unlock: "high-streak" },
+  { id: "butler", name: "執事", role: "夜番の執事", threshold: 5000, image: "../staff-butler.png", unlock: "coin-spent" }
 ];
 const REWARDS = [
   { name: "お祝いのリボン", role: "累計100回で解放", icon: "🎀", threshold: 100 },
@@ -16,7 +17,10 @@ const BAR_SHOP = [
   { id: "plant", name: "カウンターグリーン", detail: "カウンター右側に鉢植えを置きます。", icon: "🌿", cost: 0 },
   { id: "lamp", name: "アンバーランプ", detail: "柔らかな灯りをカウンター左に加えます。", icon: "💡", cost: 150 },
   { id: "bottles", name: "ボトルディスプレイ", detail: "バックバーにきらめくボトルを増やします。", icon: "🍸", cost: 350 },
-  { id: "runner", name: "ベルベットランナー", detail: "カウンターに深紅のアクセントを敷きます。", icon: "♦", cost: 700 }
+  { id: "runner", name: "ベルベットランナー", detail: "カウンターに深紅のアクセントを敷きます。", icon: "♦", cost: 700 },
+  { id: "record", name: "ミッドナイトレコード", detail: "ウォルナットのレコードプレーヤーをバックバーに置きます。", icon: "🎶", image: "../bar-record-player.png", cost: 800 },
+  { id: "stained-lamp", name: "ステンドグラスランプ", detail: "琥珀と深紅の灯りをバックバーに加えます。", icon: "🛋", image: "../bar-stained-glass-lamp.png", cost: 1200 },
+  { id: "flowers", name: "ナイトブルーム", detail: "ドライフラワーをカウンターに飾ります。", icon: "💐", image: "../bar-dry-flower-vase.png", cost: 1800 }
 ];
 const BAR_RANKS = [
   { name: "BAR ビギナー", threshold: 0 }, { name: "カウンター常連", threshold: 100 }, { name: "ナイト・トレーニー", threshold: 300 }, { name: "SQUAT BAR VIP", threshold: 1000 }, { name: "レジェンド", threshold: 3000 }
@@ -92,27 +96,36 @@ function coinBalance() { return Math.max(0, total() - coinsSpent()); }
 function renderBarDecor() {
   const owned = ownedShopItems();
   document.querySelector("#bar-plant").hidden = !owned.has("plant");
-  ["lamp", "bottles", "runner"].forEach(id => { document.querySelector(`#bar-upgrade-${id}`).hidden = !owned.has(id); });
+  ["lamp", "bottles", "runner", "record", "stained-lamp", "flowers"].forEach(id => {
+    const element = document.querySelector(`#bar-upgrade-${id}`);
+    if (element) element.hidden = !owned.has(id);
+  });
 }
 function buyBarItem(id) {
   const item = BAR_SHOP.find(candidate => candidate.id === id); if (!item || ownedShopItems().has(id)) return;
   if (coinBalance() < item.cost) return toast(`あと ${item.cost - coinBalance()} coin 必要です。`);
-  data.purchases = [...ownedShopItems(), id]; saveData(); render();
+  const unlockedBefore = unlockedStaffIds();
+  data.purchases = [...ownedShopItems(), id];
+  const newlyUnlocked = [...unlockedStaffIds()].filter(staffId => !unlockedBefore.has(staffId));
+  saveData(); render(); showUnlockDialog(newlyUnlocked);
   toast(`${item.icon} ${item.name}をバーに設置しました。`);
 }
-function drinkForStaff(staff) { return ({ luna: "シトラスジンフィズ", mirei: "スパイスハイボール", manager: "ベルモットソーダ" })[staff.id] ?? "おすすめの一杯"; }
+function drinkForStaff(staff) { return ({ luna: "シトラスジンフィズ", mirei: "スパイスハイボール", manager: "ベルモットソーダ", butler: "スモーキー・オールドファッション" })[staff.id] ?? "おすすめの一杯"; }
 function activeCompanion() { const staff = MAIDS.find(candidate => candidate.id === data.companion?.staffId); return staff && isStaffUnlocked(staff) ? staff : null; }
-function companionLine(staff) { return ({ luna: "一緒なら、もう少しだけ頑張れそう。", mirei: "よし、並んでいこう！", manager: "ペースを合わせましょう。" })[staff.id] ?? "一緒にいきましょう。"; }
+function companionLine(staff) { return ({ luna: "その調子。落ち着いていこう。", mirei: "よし、並んでいこう！", manager: "ペースを合わせましょう。", butler: "良いリズムです。そのまま続けましょう。" })[staff.id] ?? "応援しています。"; }
 function startCompanionSession() {
   const staff = selectedStaff(); if (activeCompanion()) return toast("乾杯セッションが進行中です。次の記録を完了してください。");
   if (coinBalance() < 50) return toast(`あと ${50 - coinBalance()} coin 必要です。`);
-  data.coinSpent = Math.max(0, Number(data.coinSpent) || 0) + 50; data.companion = { staffId: staff.id, startedAt: Date.now() }; saveData(); render();
+  const unlockedBefore = unlockedStaffIds();
+  data.coinSpent = Math.max(0, Number(data.coinSpent) || 0) + 50; data.companion = { staffId: staff.id, startedAt: Date.now() };
+  const newlyUnlocked = [...unlockedStaffIds()].filter(staffId => !unlockedBefore.has(staffId));
+  saveData(); render(); showUnlockDialog(newlyUnlocked);
   toast(`🥂 ${staffName(staff)}へ${drinkForStaff(staff)}を振る舞いました。次の記録を応援します。`);
 }
 function renderCompanionShop() {
   const root = document.querySelector("#companion-shop"), staff = selectedStaff(), companion = activeCompanion(), balance = coinBalance(); root.innerHTML = "";
   const card = document.createElement("article"); card.className = "companion-shop-card";
-  card.innerHTML = `<span>🥃</span><div><small>選択中のスタッフ: ${escapeHtml(staffName(staff))}</small><strong>${escapeHtml(drinkForStaff(staff))}を振る舞う</strong><p>50 coinで、次のスクワット記録をスタッフと一緒に行えます。</p></div>`;
+  card.innerHTML = `<span>🥃</span><div><small>選択中のスタッフ: ${escapeHtml(staffName(staff))}</small><strong>${escapeHtml(drinkForStaff(staff))}を振る舞う</strong><p>50 coinで、次の記録をスタッフが応援します。</p></div>`;
   const button = document.createElement("button"); button.type = "button";
   if (companion) { button.disabled = true; button.textContent = `${staffName(companion)}と進行中`; }
   else { button.disabled = balance < 50; button.textContent = "50 coinで乾杯"; button.onclick = startCompanionSession; }
@@ -134,15 +147,24 @@ function highAchievementStreak() {
   let count = 0; while ((dailyTotals.get(dayKey(date)) ?? 0) >= 100) { count += 1; date.setDate(date.getDate() - 1); }
   return count;
 }
-function isStaffUnlocked(staff, all = total()) { return staff.unlock === "high-streak" ? highAchievementStreak() >= 7 : all >= staff.threshold; }
-function staffUnlockLabel(staff) { return staff.unlock === "high-streak" ? `1日100回以上を7日連続で達成（現在 ${Math.min(highAchievementStreak(), 7)} / 7日）` : `累計${staff.threshold}回で解放`; }
+function isStaffUnlocked(staff, all = total()) {
+  if (staff.unlock === "high-streak") return highAchievementStreak() >= 7;
+  if (staff.unlock === "coin-spent") return coinsSpent() >= staff.threshold;
+  return all >= staff.threshold;
+}
+function staffUnlockLabel(staff) {
+  if (staff.unlock === "high-streak") return `1日100回以上を7日連続で達成（現在 ${Math.min(highAchievementStreak(), 7)} / 7日）`;
+  if (staff.unlock === "coin-spent") return `coinを5,000使用（現在 ${Math.min(coinsSpent(), staff.threshold).toLocaleString()} / ${staff.threshold.toLocaleString()} coin）`;
+  return `累計${staff.threshold}回で解放`;
+}
 function staffName(staff) { return data.staffNames?.[staff.id] || (staff.id === "luna" ? data.maidName : staff.name); }
 function selectedStaff() { return MAIDS.find(staff => staff.id === data.selectedStaffId) ?? MAIDS[0]; }
 function dialogueFor(staff, current, goal) {
   const lines = {
     luna: current >= goal ? "目標クリア。おつかれさま、今日はゆっくりして。" : current === 0 ? "焦らなくていい。できる分から始めよう。" : current < goal / 2 ? "その調子。呼吸を忘れずに。" : "半分まできたね。無理はしないで。",
     mirei: current >= goal ? "目標達成！ 最高だよ、この勢いでいこう！" : current === 0 ? "準備はいい？ まず一回、いこう！" : current < goal / 2 ? "いいぞ！ まだまだいける！" : "折り返し！ ここからが勝負だよ！",
-    manager: current >= goal ? "目標達成ですね。よくできました。次も丁寧に続けましょう。" : current === 0 ? "姿勢を整えてから始めましょう。回数より質です。" : current < goal / 2 ? "丁寧に。反動に頼らないように。" : "残りも同じフォームで。崩さないこと。"
+    manager: current >= goal ? "目標達成ですね。よくできました。次も丁寧に続けましょう。" : current === 0 ? "姿勢を整えてから始めましょう。回数より質です。" : current < goal / 2 ? "丁寧に。反動に頼らないように。" : "残りも同じフォームで。崩さないこと。",
+    butler: current >= goal ? "見事です。本日の積み重ねを、どうぞ誇りになさってください。" : current === 0 ? "ご準備が整いましたら、一回ずつ丁寧に参りましょう。" : current < goal / 2 ? "良い呼吸です。急がず、そのリズムを保ちましょう。" : "あと少しです。肩の力を抜いて、静かに続けましょう。"
   };
   return lines[staff.id] ?? lines.luna;
 }
@@ -151,7 +173,8 @@ function recordReactionFor(staff, count) {
   const lines = {
     luna: { low: "いいね。少しずつで十分。", medium: "しっかり積み上げたね。えらい。", high: "100回以上……すごいよ。ちゃんと休んで。" },
     mirei: { low: "いいスタート！ 次もいこう！", medium: "その回数、燃えてきた！", high: "100回超え！ 本気、見せてもらったよ！" },
-    manager: { low: "記録できました。継続が大切です。", medium: "よくできました。フォームも確認しましょう。", high: "見事です。ただし無理は禁物ですよ。" }
+    manager: { low: "記録できました。継続が大切です。", medium: "よくできました。フォームも確認しましょう。", high: "見事です。ただし無理は禁物ですよ。" },
+    butler: { low: "承知しました。小さな一歩も、立派な記録です。", medium: "美しい積み重ねです。この調子で参りましょう。", high: "お見事です。水分を取り、ゆっくり整えてください。" }
   };
   return lines[staff.id]?.[level] ?? lines.luna[level];
 }
@@ -275,7 +298,8 @@ function renderShop() {
   const root = document.querySelector("#shop-list"), balance = coinBalance(), owned = ownedShopItems(); root.innerHTML = "";
   BAR_SHOP.forEach(item => {
     const purchased = owned.has(item.id); const card = document.createElement("article"); card.className = `shop-item ${purchased ? "owned" : ""}`;
-    card.innerHTML = `<span class="shop-icon">${item.icon}</span><div><strong>${item.name}</strong><small>${item.detail}</small></div>`;
+    const thumbnail = item.image ? `<img src="${item.image}" alt="" />` : item.icon;
+    card.innerHTML = `<span class="shop-icon">${thumbnail}</span><div><strong>${item.name}</strong><small>${item.detail}</small></div>`;
     const button = document.createElement("button"); button.type = "button";
     if (purchased) { button.className = "shop-owned"; button.textContent = "設置済み"; button.disabled = true; }
     else { button.className = "shop-buy"; button.textContent = `${item.cost} coin`; button.disabled = balance < item.cost; button.setAttribute("aria-label", `${item.name}を${item.cost} coinで購入`); button.onclick = () => buyBarItem(item.id); }
