@@ -1,7 +1,7 @@
 const STORAGE_KEY = "squat-bar-general-data-v1";
 const AUTO_BACKUP_KEY = `${STORAGE_KEY}-auto-recovery-v1`;
 const SQUAT_MET = 5;
-const BACKUP_VERSION = 4;
+const BACKUP_VERSION = 5;
 const MAIDS = [
   { id: "luna", name: "ルナ", role: "カウンター担当", threshold: 0, image: "a_clean_cutout_transparent_background_illustration.png" },
   { id: "mirei", name: "ミレイ", role: "もうひとりのスタッフ", threshold: 1000, image: "staff-2.png" },
@@ -38,7 +38,7 @@ let motionOriginRecord = null;
 let motionTimer = null;
 let pendingMotionResult = null;
 
-function defaultData() { return { goal: 30, maidName: "ルナ", staffNames: {}, selectedStaffId: "luna", weightKg: 60, motionMode: "standard", purchases: ["plant"], coinSpent: 0, companion: null, records: [] }; }
+function defaultData() { return { goal: 30, maidName: "ルナ", staffNames: {}, selectedStaffId: "luna", weightKg: 60, motionMode: "standard", purchases: ["plant"], coinSpent: 0, bonusCoins: 0, completedDailyOrders: [], staffAffinity: {}, companion: null, records: [] }; }
 function readSavedValue(key) { try { const value = JSON.parse(localStorage.getItem(key)); return value && typeof value === "object" ? value : null; } catch { return null; } }
 function savedData(value) { return value && typeof value === "object" && Array.isArray(value.records) ? value : null; }
 function loadData() {
@@ -73,6 +73,9 @@ function normalizeImportedData(candidate) {
     motionMode: MOTION_MODES[candidate.motionMode] ? candidate.motionMode : "standard",
     purchases: [...new Set(Array.isArray(candidate.purchases) ? candidate.purchases : ["plant"])].filter(id => BAR_SHOP.some(item => item.id === id)),
     coinSpent: Math.max(0, Number(candidate.coinSpent) || 0),
+    bonusCoins: Math.max(0, Number(candidate.bonusCoins) || 0),
+    completedDailyOrders: [...new Set(Array.isArray(candidate.completedDailyOrders) ? candidate.completedDailyOrders.map(String) : [])].slice(-120),
+    staffAffinity: Object.fromEntries(MAIDS.map(staff => [staff.id, Math.max(0, Math.min(100, Number(candidate.staffAffinity?.[staff.id]) || 0))])),
     companion: MAIDS.some(staff => staff.id === candidate.companion?.staffId) ? { staffId: candidate.companion.staffId, startedAt: Number(candidate.companion.startedAt) || Date.now() } : null,
     records: candidate.records.map(record => ({
       id: String(record.id || crypto.randomUUID()),
@@ -89,7 +92,25 @@ function todayKey() { return dayKey(Date.now()); }
 function total() { return data.records.reduce((sum, record) => sum + record.count, 0); }
 function ownedShopItems() { return new Set(Array.isArray(data.purchases) ? data.purchases : []); }
 function coinsSpent() { const owned = ownedShopItems(); return BAR_SHOP.reduce((sum, item) => sum + (owned.has(item.id) ? item.cost : 0), 0) + Math.max(0, Number(data.coinSpent) || 0); }
-function coinBalance() { return Math.max(0, total() - coinsSpent()); }
+function coinBalance() { return Math.max(0, total() + Math.max(0, Number(data.bonusCoins) || 0) - coinsSpent()); }
+function dailyOrderFor(date = new Date()) {
+  const orders = [
+    { title: "開店ストレッチ", detail: "今日は10回、ゆっくり整えよう。", target: 10, reward: 5 },
+    { title: "カウンターラウンド", detail: "今日は20回。心地よいペースで。", target: 20, reward: 10 },
+    { title: "ナイトチャレンジ", detail: "今日は30回。目標まで積み上げよう。", target: 30, reward: 15 },
+    { title: "ラストオーダー", detail: "今日は50回。余裕があれば挑戦。", target: 50, reward: 25 }
+  ];
+  const key = dayKey(date).split("-").map(Number);
+  return { ...orders[(key[0] + key[1] * 3 + key[2] * 7) % orders.length], key: dayKey(date) };
+}
+function affinityFor(staff) { return Math.max(0, Number(data.staffAffinity?.[staff.id]) || 0); }
+function affinityRank(points) { return points >= 60 ? { name: "信頼ランク IV", next: null } : points >= 30 ? { name: "信頼ランク III", next: 60 } : points >= 10 ? { name: "信頼ランク II", next: 30 } : { name: "信頼ランク I", next: 10 }; }
+function addAffinity(staff, count) {
+  const before = affinityFor(staff), gain = Math.max(1, Math.min(5, Math.ceil(count / 10))), after = Math.min(100, before + gain);
+  data.staffAffinity ??= {}; data.staffAffinity[staff.id] = after;
+  const beforeRank = affinityRank(before), afterRank = affinityRank(after);
+  return { gain, rankUp: beforeRank.name !== afterRank.name, rank: afterRank };
+}
 function renderBarDecor() {
   const owned = ownedShopItems();
   document.querySelector("#bar-plant").hidden = !owned.has("plant");
@@ -206,7 +227,15 @@ function render() {
   document.querySelector("#maid-name").textContent = staffName(activeStaff);
   document.querySelector("#staff-dialog-image").src = activeStaff.image;
   document.querySelector("#staff-dialog-image").alt = `${staffName(activeStaff)}の全身イラスト`;
-  renderBarDecor(); renderHistory(); renderCollection(all);
+  renderBarDecor(); renderHistory(); renderCollection(all); renderDailyOrder();
+}
+function renderDailyOrder() {
+  const order = dailyOrderFor(), completed = (data.completedDailyOrders ?? []).includes(order.key), current = todayTotal();
+  document.querySelector("#daily-order-title").textContent = order.title;
+  document.querySelector("#daily-order-detail").textContent = `${order.detail}（${Math.min(current, order.target)} / ${order.target}回）`;
+  document.querySelector("#daily-order-reward").textContent = completed ? "達成済み" : `+${order.reward} coin`;
+  document.querySelector("#daily-order-progress").style.width = `${Math.min(100, current / order.target * 100)}%`;
+  document.querySelector("#daily-order-card").classList.toggle("completed", completed);
 }
 function renderHistory() {
   const list = document.querySelector("#history-list"), empty = document.querySelector("#history-empty");
@@ -259,7 +288,11 @@ function renderCollection(all) {
       const nameRow = document.createElement("label"); nameRow.className = "staff-card-name-row"; nameRow.innerHTML = "<span>表示名</span>";
       const input = document.createElement("input"); input.type = "text"; input.maxLength = 20; input.value = staffName(staff); input.setAttribute("aria-label", `${staffName(staff)}の表示名`);
       input.onchange = event => { const nextName = event.target.value.trim().slice(0, 20) || staff.name; data.staffNames ??= {}; data.staffNames[staff.id] = nextName; if (staff.id === "luna") data.maidName = nextName; saveData(); render(); };
-      nameRow.append(input); card.append(select, nameRow);
+      const affinity = affinityFor(staff), affinityLevel = affinityRank(affinity);
+      const affinityRow = document.createElement("div"); affinityRow.className = "staff-affinity";
+      const affinityProgress = affinityLevel.next ? Math.min(100, affinity / affinityLevel.next * 100) : 100;
+      affinityRow.innerHTML = `<div><span>信頼度</span><strong>${affinityLevel.name}</strong><small>${affinity} pt</small></div><i><b style="width:${affinityProgress}%"></b></i>`;
+      nameRow.append(input); card.append(select, affinityRow, nameRow);
     } else card.innerHTML = `<div class="staff-select-main"><span class="staff-lock-avatar">🔒</span><span><strong>？？？</strong><small>${staffUnlockLabel(staff)}</small></span><b>🔒</b></div>`;
     list.append(card);
   });
@@ -431,7 +464,14 @@ document.addEventListener("visibilitychange", () => {
   if (document.hidden) pauseMotionCounter();
   else if (motionState?.started && motionState.phase === "paused" && document.querySelector("#motion-dialog").open && !document.querySelector("#motion-resume-dialog").open) document.querySelector("#motion-resume-dialog").showModal();
 });
-document.querySelector("#record-form").addEventListener("submit", event => { event.preventDefault(); const unlockedBefore = unlockedStaffIds(); setInputCount(document.querySelector("#count-input").value); const before = todayTotal(); const companion = activeCompanion(); const createdAt = new Date(document.querySelector("#performed-at-input").value).getTime() || Date.now(); const memo = document.querySelector("#memo-input").value.trim(); const existing = data.records.find(record => record.id === editingRecordId); if (existing) { existing.count = inputCount; existing.memo = memo; existing.createdAt = createdAt; if (pendingMotionResult) Object.assign(existing, pendingMotionResult); } else { data.records.push({ id: crypto.randomUUID(), count: inputCount, memo, createdAt, ...(pendingMotionResult ?? {}) }); } const newlyUnlocked = [...unlockedStaffIds()].filter(id => !unlockedBefore.has(id)); if (!existing && companion) data.companion = null; saveData(); document.querySelector("#record-dialog").close(); document.querySelector("#memo-input").value = ""; const wasEditing = editingRecordId !== null; editingRecordId = null; pendingMotionResult = null; render(); const activeStaff = selectedStaff(); if (!wasEditing) toast((before < data.goal && todayTotal() >= data.goal ? `✦ ${staffName(activeStaff)}「${dialogueFor(activeStaff, data.goal, data.goal)}」` : `${staffName(activeStaff)}「${recordReactionFor(activeStaff, inputCount)}」`) + ` +${inputCount} coin`); if (!wasEditing && companion) window.setTimeout(() => toast(`🥂 ${staffName(companion)}「${companionLine(companion)}」`), 420); showUnlockDialog(newlyUnlocked); });
+document.querySelector("#record-form").addEventListener("submit", event => { event.preventDefault(); const unlockedBefore = unlockedStaffIds(); setInputCount(document.querySelector("#count-input").value); const before = todayTotal(); const companion = activeCompanion(); const createdAt = new Date(document.querySelector("#performed-at-input").value).getTime() || Date.now(); const memo = document.querySelector("#memo-input").value.trim(); const existing = data.records.find(record => record.id === editingRecordId); if (existing) { existing.count = inputCount; existing.memo = memo; existing.createdAt = createdAt; if (pendingMotionResult) Object.assign(existing, pendingMotionResult); } else { data.records.push({ id: crypto.randomUUID(), count: inputCount, memo, createdAt, ...(pendingMotionResult ?? {}) }); } const newlyUnlocked = [...unlockedStaffIds()].filter(id => !unlockedBefore.has(id));
+  const affinity = !existing ? addAffinity(selectedStaff(), inputCount) : null;
+  const order = dailyOrderFor();
+  const dailyOrderCompleted = !existing && todayTotal() >= order.target && !(data.completedDailyOrders ?? []).includes(order.key);
+  if (dailyOrderCompleted) { data.completedDailyOrders ??= []; data.completedDailyOrders.push(order.key); data.completedDailyOrders = data.completedDailyOrders.slice(-120); data.bonusCoins = Math.max(0, Number(data.bonusCoins) || 0) + order.reward; }
+  if (!existing && companion) data.companion = null; saveData(); document.querySelector("#record-dialog").close(); document.querySelector("#memo-input").value = ""; const wasEditing = editingRecordId !== null; editingRecordId = null; pendingMotionResult = null; render(); const activeStaff = selectedStaff(); if (!wasEditing) toast((before < data.goal && todayTotal() >= data.goal ? `✦ ${staffName(activeStaff)}「${dialogueFor(activeStaff, data.goal, data.goal)}」` : `${staffName(activeStaff)}「${recordReactionFor(activeStaff, inputCount)}」`) + ` +${inputCount} coin`); if (!wasEditing && affinity?.rankUp) window.setTimeout(() => toast(`✦ ${staffName(activeStaff)}との${affinity.rank.name}になりました。`), 360);
+  if (!wasEditing && dailyOrderCompleted) window.setTimeout(() => toast(`★ 日替わりオーダー達成！ +${order.reward} coin`), 700);
+  if (!wasEditing && companion) window.setTimeout(() => toast(`🥂 ${staffName(companion)}「${companionLine(companion)}」`), 1040); showUnlockDialog(newlyUnlocked); });
 document.querySelector("#goal-minus").onclick = () => { data.goal = Math.max(5, data.goal - 5); saveData(); render(); };
 document.querySelector("#goal-plus").onclick = () => { data.goal = Math.min(500, data.goal + 5); saveData(); render(); };
 document.querySelector("#goal-input").addEventListener("change", event => { data.goal = Math.min(500, Math.max(5, Number.parseInt(event.target.value, 10) || 5)); saveData(); render(); });
