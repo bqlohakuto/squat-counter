@@ -190,7 +190,11 @@ function renderPenaltyUi() {
   const configured = Boolean(window.PenaltySync?.isConfigured());
   const ready = penaltySyncStatus === "connected";
   const labels = { connected: "同期中", connecting: "取得中", unconfigured: "未設定", error: "取得できません" };
-  document.querySelectorAll(".quickdeck-card").forEach(card => { card.hidden = !configured; });
+  document.querySelector("#motion-dialog .quickdeck-card").hidden = !configured;
+  document.querySelectorAll("#home-page .quickdeck-target, #home-page .quickdeck-details").forEach(row => { row.hidden = !configured; });
+  const setupButton = document.querySelector("#open-quickdeck-setup");
+  setupButton.hidden = configured && penaltySyncStatus !== "error";
+  setupButton.textContent = configured ? "連携設定を確認する" : "QuickDeckと連携する";
   document.querySelectorAll("[data-quickdeck-status]").forEach(label => { label.textContent = labels[penaltySyncStatus]; });
   document.querySelectorAll("[data-quickdeck-count]").forEach(field => {
     field.textContent = ready ? penaltyState[field.dataset.quickdeckCount].toLocaleString("ja-JP") : "—";
@@ -495,6 +499,13 @@ document.querySelector("#import-data-input").addEventListener("change", async ev
   } catch { toast("読み込めないバックアップファイルです。"); }
 });
 document.querySelector("#add-reminder-button").onclick = async () => { const reminder = { title: "SQUAT BAR", text: "スクワットを記録する", url: location.href }; if (!navigator.share) return toast("iPhoneのSafariから開くとリマインダーへ追加できます。"); try { await navigator.share(reminder); } catch (error) { if (error.name !== "AbortError") toast("共有メニューを開けませんでした。"); } };
+function openQuickDeckSetup() {
+  showPage("settings");
+  const input = document.querySelector("#penalty-setup-input");
+  input.closest("article").scrollIntoView({ block: "center" });
+  input.focus({ preventScroll: true });
+}
+document.querySelector("#open-quickdeck-setup").onclick = openQuickDeckSetup;
 document.querySelector("#penalty-setup-save").onclick = () => {
   try {
     window.PenaltySync.importSetup(document.querySelector("#penalty-setup-input").value);
@@ -537,3 +548,14 @@ document.querySelector("#unlock-dialog").addEventListener("cancel", event => eve
 if ("serviceWorker" in navigator) navigator.serviceWorker.register("service-worker.js");
 saveData();
 render();
+
+// A pairing QR fills the same form as a paste. Saving is always a user action.
+function fillQuickDeckSetupFromLink() {
+  const mobileSetup = new URLSearchParams(location.hash.slice(1)).get("quickdeck");
+  if (mobileSetup === null) return;
+  history.replaceState(null, "", location.pathname + location.search);
+  document.querySelector("#penalty-setup-input").value = mobileSetup;
+  openQuickDeckSetup();
+}
+window.addEventListener("hashchange", fillQuickDeckSetupFromLink);
+fillQuickDeckSetupFromLink();

@@ -71,12 +71,11 @@
     return Array.from(bytes, value => value.toString(16).padStart(2, '0')).join('').match(/.{1,4}/g).join('-');
   }
 
-  function sanitizeRoom(room) {
-    return String(room || '').trim().toLowerCase().replace(/[^a-z0-9-]/g, '').slice(0, 40);
-  }
-
   function setSetup(config, room) {
-    const safeRoom = sanitizeRoom(room) || generateRoom();
+    const safeRoom = String(room || '').trim() || generateRoom();
+    if (/[.#$\[\]/\u0000-\u001f\u007f]/.test(safeRoom) || new TextEncoder().encode(safeRoom).length > 768) {
+      throw new Error('共有ルームIDに使用できない文字が含まれているか、長すぎます。');
+    }
     if (!config || typeof config !== 'object') throw new Error('Firebase設定が正しくありません。');
     if (!config.apiKey || !config.projectId || !config.databaseURL) throw new Error('apiKey / projectId / databaseURL が必要です。');
     localStorage.setItem(CONFIG_KEY, JSON.stringify(config));
@@ -97,7 +96,11 @@
   }
 
   function importSetup(text) {
-    const payload = JSON.parse(String(text || '').trim());
+    let payload;
+    try { payload = JSON.parse(String(text || '').trim()); } catch {
+      throw new Error('QuickDeckの「スマホ用設定をコピー」で取得した設定を貼り付けてください。');
+    }
+    if (typeof payload?.room !== 'string' || !payload.room.trim()) throw new Error('共有ルームIDがありません。QuickDeckのスマホ用設定を確認してください。');
     return setSetup(payload.config, payload.room);
   }
 

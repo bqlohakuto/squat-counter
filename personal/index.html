@@ -20,10 +20,11 @@
       </header>
 
       <section id="home-page" class="page active" aria-label="ホーム">
-        <article class="quickdeck-card" aria-label="QuickDeckの目標回数" hidden>
-          <div class="quickdeck-heading"><strong>QuickDeckの目標回数</strong><small data-quickdeck-status></small></div>
-          <p class="quickdeck-target"><b data-quickdeck-count="target">—</b> 回</p>
-          <p class="quickdeck-details">実施 <b data-quickdeck-count="completed">—</b> 回 · 残り <b data-quickdeck-count="remaining">—</b> 回</p>
+        <article class="quickdeck-card" aria-label="QuickDeckの目標回数">
+          <div class="quickdeck-heading"><strong>QuickDeckの目標回数</strong><small data-quickdeck-status>確認中</small></div>
+          <p class="quickdeck-target" hidden><b data-quickdeck-count="target">—</b> 回</p>
+          <p class="quickdeck-details" hidden>実施 <b data-quickdeck-count="completed">—</b> 回 · 残り <b data-quickdeck-count="remaining">—</b> 回</p>
+          <button id="open-quickdeck-setup" class="secondary-button" type="button" hidden>QuickDeckと連携する</button>
           <progress id="penalty-progress" aria-label="QuickDeck目標の達成状況" hidden></progress>
         </article>
         <article class="bar-card">
@@ -86,8 +87,8 @@
         <article class="settings-card"><label for="motion-mode-input">太もも計測の感度</label><select id="motion-mode-input" class="settings-input"><option value="standard">標準</option><option value="slow">ゆっくり</option><option value="deep">深くしゃがむ</option></select><p id="motion-mode-hint" class="input-hint"></p></article>
         <article class="settings-card"><strong>一般用アプリ</strong><p class="input-hint">ゲーム要素を楽しむ通常版はこちらです。</p><a class="secondary-button edition-link" href="../">一般用を開く</a></article>
         <article class="settings-card talk-coach-link-settings">
-          <strong>Talk Coach連携</strong>
-          <p class="input-hint">Quick Deckの「スマホ用設定をコピー」で取得した連携設定を貼り付けます。</p>
+          <label for="penalty-setup-input">QuickDeck連携（Talk Coach）</label>
+          <p class="input-hint">QuickDeckの「スマホ用設定をコピー」で取得した設定を貼り付けて保存してください。</p>
           <textarea id="penalty-setup-input" rows="5" placeholder='{"version":1,"config":{...},"room":"..."}'></textarea>
           <div class="backup-actions">
             <button id="penalty-setup-save" class="secondary-button" type="button">連携設定を保存</button>
@@ -164,7 +165,7 @@
     <script src="https://www.gstatic.com/firebasejs/12.19.0/firebase-app-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/12.19.0/firebase-auth-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/12.19.0/firebase-database-compat.js"></script>
-    <script src="penalty-sync.js"></script>
-    <script src="app.js"></script>
+    <script src="penalty-sync.js?v=19"></script>
+    <script src="app.js?v=19"></script>
   </body>
 </html>
