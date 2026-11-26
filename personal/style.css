@@ -101,3 +101,20 @@ dialog { background:#302421; color:#f5e9da; }.close-button { color:#e7d7c6; }.to
 .bar-upgrade-bottles { background:none; border:0; box-shadow:none; height:auto; left:9px; opacity:1; top:26px; width:78px; }
 .bar-upgrade-runner { background:none; border:0; bottom:32px; box-shadow:none; height:auto; left:50%; transform:translateX(-50%); width:128px; }
 @media (max-height:700px) { .bar-upgrade-lamp { left:14px; top:24px; transform:none; width:39px; }.bar-upgrade-bottles { left:7px; top:21px; transform:none; width:64px; }.bar-upgrade-runner { bottom:31px; transform:translateX(-50%); width:106px; } }
+.quickdeck-card {
+  background: #30231f;
+  border: 1px solid #a67a4c;
+  border-radius: 16px;
+  color: #f7ead9;
+  font-variant-numeric: tabular-nums;
+  margin-bottom: 14px;
+  padding: 13px 16px;
+}
+.quickdeck-heading { align-items: baseline; display: flex; flex-wrap: wrap; gap: 4px 12px; justify-content: space-between; }
+.quickdeck-heading strong { font-size: 14px; }
+.quickdeck-heading small, .quickdeck-details { color: #d6bd9e; font-size: 12px; }
+.quickdeck-target { color: #f4ca88; font-weight: 700; margin: 4px 0; }
+.quickdeck-target b { font-size: 28px; }
+.quickdeck-details { margin: 0; }
+.quickdeck-card progress { accent-color: #ebbc7b; height: 6px; margin-top: 7px; width: 100%; }
+.motion-dialog .quickdeck-card { margin-top: 12px; }

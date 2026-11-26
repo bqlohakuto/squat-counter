@@ -39,6 +39,7 @@ let motionTimer = null;
 let pendingMotionResult = null;
 let penaltyState = { target: 0, completed: 0, remaining: 0, status: "idle" };
 let penaltySyncStatus = "unconfigured";
+let penaltySyncMessage = "";
 let previousPenaltyRemaining = null;
 
 function defaultData() { return { goal: 30, maidName: "ルナ", staffNames: {}, selectedStaffId: "luna", weightKg: 60, motionMode: "standard", purchases: ["plant"], coinSpent: 0, companion: null, records: [] }; }
@@ -187,26 +188,20 @@ function streak() {
 }
 function renderPenaltyUi() {
   const configured = Boolean(window.PenaltySync?.isConfigured());
-  const card = document.querySelector("#talk-coach-penalty-card");
-  const motionCard = document.querySelector("#motion-penalty-live");
-  if (card) card.hidden = !configured;
-  if (motionCard) motionCard.hidden = !configured || penaltyState.target <= 0;
-
-  document.querySelector("#penalty-completed").textContent = penaltyState.completed ?? 0;
-  document.querySelector("#penalty-target").textContent = penaltyState.target ?? 0;
-  document.querySelector("#penalty-remaining").textContent = penaltyState.remaining ?? 0;
-  document.querySelector("#motion-penalty-completed").textContent = penaltyState.completed ?? 0;
-  document.querySelector("#motion-penalty-target").textContent = penaltyState.target ?? 0;
-  document.querySelector("#motion-penalty-remaining").textContent = penaltyState.remaining ?? 0;
-
-  const percent = penaltyState.target > 0 ? Math.min(100, penaltyState.completed / penaltyState.target * 100) : 0;
-  document.querySelector("#penalty-progress").style.width = percent + "%";
-
-  const labels = { connected: "同期中", connecting: "接続中", unconfigured: "未設定", error: "エラー" };
-  document.querySelector("#penalty-sync-status").textContent = labels[penaltySyncStatus] ?? penaltySyncStatus;
+  const ready = penaltySyncStatus === "connected";
+  const labels = { connected: "同期中", connecting: "取得中", unconfigured: "未設定", error: "取得できません" };
+  document.querySelectorAll(".quickdeck-card").forEach(card => { card.hidden = !configured; });
+  document.querySelectorAll("[data-quickdeck-status]").forEach(label => { label.textContent = labels[penaltySyncStatus]; });
+  document.querySelectorAll("[data-quickdeck-count]").forEach(field => {
+    field.textContent = ready ? penaltyState[field.dataset.quickdeckCount].toLocaleString("ja-JP") : "—";
+  });
+  const progress = document.querySelector("#penalty-progress");
+  progress.hidden = !ready || penaltyState.target === 0;
+  progress.max = Math.max(1, penaltyState.target);
+  progress.value = penaltyState.completed;
   document.querySelector("#penalty-setup-status").textContent = configured
-    ? (labels[penaltySyncStatus] ?? penaltySyncStatus)
-    : "Quick Deckから連携設定を貼り付けてください。";
+    ? (penaltySyncMessage || labels[penaltySyncStatus])
+    : "QuickDeckから連携設定を貼り付けてください。";
 }
 
 function render() {
@@ -519,8 +514,7 @@ document.querySelector("#penalty-setup-clear").onclick = () => {
 if (window.PenaltySync) {
   window.PenaltySync.onStatus(({ status, message }) => {
     penaltySyncStatus = status;
-    const statusEl = document.querySelector("#penalty-setup-status");
-    if (statusEl && message) statusEl.textContent = message;
+    penaltySyncMessage = message;
     renderPenaltyUi();
   });
 

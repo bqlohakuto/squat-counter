@@ -8,6 +8,7 @@
 
   let remoteRef = null;
   let current = { ...DEFAULT_STATE };
+  let currentStatus = { status: 'unconfigured', message: '' };
   let initPromise = null;
   const listeners = new Set();
   const statusListeners = new Set();
@@ -39,6 +40,7 @@
 
   function emitStatus(status, message = '') {
     const detail = { status, message };
+    currentStatus = detail;
     statusListeners.forEach(listener => {
       try { listener(detail); } catch (_) {}
     });
@@ -129,12 +131,14 @@
         if (!auth.currentUser) await auth.signInAnonymously();
 
         remoteRef = app.database().ref('penaltySessions/' + getRoom());
-        remoteRef.on('value', snapshot => emit(snapshot.val() || DEFAULT_STATE), error => {
+        remoteRef.on('value', snapshot => {
+          emit(snapshot.val() || DEFAULT_STATE);
+          if (currentStatus.status !== 'connected') emitStatus('connected', 'QuickDeckと同期中');
+        }, error => {
           console.error('[Penalty Sync]', error);
           emitStatus('error', error.message || '同期に失敗しました。');
         });
 
-        emitStatus('connected', 'SQUAT BARと同期中');
         return true;
       } catch (error) {
         console.error('[Penalty Sync]', error);
@@ -199,6 +203,7 @@
 
   function onStatus(listener) {
     statusListeners.add(listener);
+    listener(currentStatus);
     return () => statusListeners.delete(listener);
   }
 
